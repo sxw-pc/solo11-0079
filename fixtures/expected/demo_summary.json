@@ -1,0 +1,275 @@
+{
+  "actions": [
+    {
+      "action_id": "f8747621cf2b",
+      "object_id": "ds-ledger",
+      "priority": "critical",
+      "rule_ids": [
+        "OBJ-POINT-001"
+      ]
+    },
+    {
+      "action_id": "2b429149cb24",
+      "object_id": "evidence/evidence-missing.txt",
+      "priority": "high",
+      "rule_ids": [
+        "EVID-001"
+      ]
+    },
+    {
+      "action_id": "1a4d557fca1c",
+      "object_id": "bk-events-015",
+      "priority": "high",
+      "rule_ids": [
+        "CHAIN-005"
+      ]
+    },
+    {
+      "action_id": "598af22742cf",
+      "object_id": "bk-events-016",
+      "priority": "high",
+      "rule_ids": [
+        "CHAIN-006"
+      ]
+    },
+    {
+      "action_id": "6174d0a2d4c2",
+      "object_id": "bk-events-017",
+      "priority": "high",
+      "rule_ids": [
+        "CHAIN-004"
+      ]
+    },
+    {
+      "action_id": "e4250a09903d",
+      "object_id": "bk-events-018",
+      "priority": "high",
+      "rule_ids": [
+        "CHAIN-001",
+        "CHAIN-002"
+      ]
+    },
+    {
+      "action_id": "189e4c7723a3",
+      "object_id": "bk-ledger-003",
+      "priority": "high",
+      "rule_ids": [
+        "CHAIN-005",
+        "CHAIN-009"
+      ]
+    },
+    {
+      "action_id": "9dc388bb8dea",
+      "object_id": "drill-ledger-0908",
+      "priority": "high",
+      "rule_ids": [
+        "EVID-004",
+        "EVID-005",
+        "EVID-006",
+        "EVID-009"
+      ]
+    },
+    {
+      "action_id": "dc2c995ef3f4",
+      "object_id": "bk-ledger-001",
+      "priority": "high",
+      "rule_ids": [
+        "CHAIN-001",
+        "CHAIN-002"
+      ]
+    },
+    {
+      "action_id": "e0e2c16cbf7e",
+      "object_id": "bk-ledger-002",
+      "priority": "high",
+      "rule_ids": [
+        "ART-001",
+        "ART-003"
+      ]
+    },
+    {
+      "action_id": "021f9ac8ed69",
+      "object_id": "ds-orders",
+      "priority": "high",
+      "rule_ids": [
+        "OBJ-RPO-001"
+      ]
+    },
+    {
+      "action_id": "209426694bc7",
+      "object_id": "drill-orders-1106",
+      "priority": "high",
+      "rule_ids": [
+        "CONS-001",
+        "CONS-002",
+        "CONS-004"
+      ]
+    },
+    {
+      "action_id": "45ee8bb9373b",
+      "object_id": "bk-orders-901",
+      "priority": "high",
+      "rule_ids": [
+        "CHAIN-006"
+      ]
+    },
+    {
+      "action_id": "795760925f46",
+      "object_id": "bk-orders-900",
+      "priority": "high",
+      "rule_ids": [
+        "CHAIN-001",
+        "CHAIN-002"
+      ]
+    },
+    {
+      "action_id": "86832f8a931d",
+      "object_id": "drill-orders-1106",
+      "priority": "high",
+      "rule_ids": [
+        "OBJ-RTO-001"
+      ]
+    },
+    {
+      "action_id": "a35843901bc4",
+      "object_id": "drill-orders-1106",
+      "priority": "high",
+      "rule_ids": [
+        "EVID-004",
+        "EVID-005"
+      ]
+    },
+    {
+      "action_id": "0e67c51b504f",
+      "object_id": "drill-ghost-0001",
+      "priority": "error",
+      "rule_ids": [
+        "IN-007"
+      ]
+    },
+    {
+      "action_id": "15d07d07eb46",
+      "object_id": "drill-ledger-0908",
+      "priority": "error",
+      "rule_ids": [
+        "IN-009"
+      ]
+    },
+    {
+      "action_id": "290394c475fe",
+      "object_id": "bk-orders-903",
+      "priority": "error",
+      "rule_ids": [
+        "IN-008"
+      ]
+    },
+    {
+      "action_id": "5698bd3836ec",
+      "object_id": "drill-mismatch-01",
+      "priority": "error",
+      "rule_ids": [
+        "IN-014"
+      ]
+    },
+    {
+      "action_id": "8dc9da21df02",
+      "object_id": "bk-orders-905",
+      "priority": "error",
+      "rule_ids": [
+        "IN-002"
+      ]
+    },
+    {
+      "action_id": "90276d8f9039",
+      "object_id": "bk-ghost-001",
+      "priority": "error",
+      "rule_ids": [
+        "IN-006"
+      ]
+    },
+    {
+      "action_id": "91f1dd62d5ba",
+      "object_id": "bk-orders-904",
+      "priority": "error",
+      "rule_ids": [
+        "IN-011"
+      ]
+    },
+    {
+      "action_id": "c3df6e4f2dc7",
+      "object_id": "line-25",
+      "priority": "error",
+      "rule_ids": [
+        "IN-012"
+      ]
+    },
+    {
+      "action_id": "d27eeb81ffe3",
+      "object_id": "bk-orders-902",
+      "priority": "error",
+      "rule_ids": [
+        "IN-009"
+      ]
+    },
+    {
+      "action_id": "afe762f1f440",
+      "object_id": "bk-ledger-002",
+      "priority": "error",
+      "rule_ids": [
+        "IN-005"
+      ]
+    },
+    {
+      "action_id": "e5976844098a",
+      "object_id": "drill-ledger-0908",
+      "priority": "medium",
+      "rule_ids": [
+        "CONS-004"
+      ]
+    }
+  ],
+  "datasets": [
+    {
+      "dataset_id": "ds-events",
+      "point_count": 14,
+      "rpo_status": "pass",
+      "status": "fail"
+    },
+    {
+      "dataset_id": "ds-ledger",
+      "point_count": 0,
+      "rpo_status": "no_points",
+      "status": "fail"
+    },
+    {
+      "dataset_id": "ds-orders",
+      "point_count": 40,
+      "rpo_status": "breach",
+      "status": "fail"
+    }
+  ],
+  "run_id": "ea64dfaf846ec4d7",
+  "status": "fail",
+  "summary": {
+    "action_count": 27,
+    "backup_count": 63,
+    "dataset_count": 3,
+    "drill_count": 4,
+    "finding_count": 40,
+    "finding_counts": {
+      "critical": 1,
+      "error": 10,
+      "high": 24,
+      "info": 1,
+      "medium": 3,
+      "warning": 1
+    },
+    "input_file_count": 143,
+    "overall_status": "fail",
+    "restorable_point_count": 54,
+    "rpo_breaches": 2,
+    "rto_breaches": 1,
+    "successful_drill_count": 2,
+    "validation_rejected_rows": 9
+  }
+}

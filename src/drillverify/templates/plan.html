@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block title %}Plan {{ run.run_id }} · DrillVerify{% endblock %}
+{% block content %}
+<p class="muted"><a href="{{ url_for('run_detail', run_pk=run.id) }}">Run {{ run.run_id }}</a> / plan</p>
+<h1>Remediation and re-drill plan</h1>
+<p class="lede">
+  Due dates are computed from configured <code>as_of</code> plus severity SLA days. No action
+  executes against a backup or restore system from this console.
+</p>
+
+<div class="cards">
+  <div class="card"><div class="label">Actions</div><div class="value">{{ report.remediation_plan.summary.action_count }}</div></div>
+  <div class="card"><div class="label">Next due</div><div class="value small">{{ report.remediation_plan.summary.next_due_at or 'none' }}</div></div>
+  {% for priority, count in report.remediation_plan.summary.by_priority.items() %}
+    <div class="card"><div class="label">{{ priority }}</div><div class="value">{{ count }}</div></div>
+  {% endfor %}
+</div>
+
+{% for action in actions %}
+<div class="panel">
+  <h3><span class="sev sev-{{ action.priority }}">{{ action.priority }}</span> · {{ action.title }}</h3>
+  <dl class="detail-grid">
+    <dt>Action ID</dt><dd><code>{{ action.action_id }}</code></dd>
+    <dt>Owner</dt><dd>{{ action.owner_team }}</dd>
+    <dt>Dataset</dt><dd>{{ action.dataset_id or 'unassigned' }}</dd>
+    <dt>Object</dt><dd><code>{{ action.object_type }}:{{ action.object_id }}</code></dd>
+    <dt>Rules</dt><dd><code>{{ action.rule_ids|join(', ') }}</code></dd>
+    <dt>Due</dt><dd>{{ action.due_at }}</dd>
+    <dt>Rationale</dt><dd>{{ action.rationale }}</dd>
+    <dt>Instruction</dt><dd>{{ action.instruction }}</dd>
+    <dt>Evidence probes</dt>
+    <dd class="small">
+      {% for probe in action.probes %}
+        <div>{{ probe.file }}{% if probe.line %}:{{ probe.line }}{% endif %} · <code>{{ probe.input_sha256[:20] }}…</code></div>
+      {% endfor %}
+    </dd>
+  </dl>
+</div>
+{% else %}
+<div class="empty">No material finding requires a remediation action for this run.</div>
+{% endfor %}
+{% endblock %}

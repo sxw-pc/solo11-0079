@@ -1,0 +1,48 @@
+schema_version: 1
+as_of: "2026-11-10T00:00:00Z"
+analysis_window_days: 7
+datasets:
+  - dataset_id: ds-orders
+    display_name: "Order Facts Warehouse (synthetic)"
+    rpo_minutes: 240
+    rto_minutes: 90
+    required_steps:
+      - precheck
+      - restore_base
+      - apply_incremental
+      - verify_rowcount
+      - verify_checksum
+      - publish_report
+    checksum_required: true
+    rowcount_required: true
+    owner_team: team-alpha
+    maintenance_window: "sun:02:00-04:00Z"
+    artifact_manifest_path: "artifacts"
+  - dataset_id: ds-events
+    display_name: "Event Landing Zone (synthetic)"
+    rpo_minutes: 960
+    rto_minutes: 180
+    required_steps:
+      - precheck
+      - restore_base
+      - verify_rowcount
+      - publish_report
+    checksum_required: false
+    rowcount_required: true
+    owner_team: team-beta
+    maintenance_window: "sat:03:00-05:00Z"
+    artifact_manifest_path: "artifacts"
+  - dataset_id: ds-ledger
+    display_name: "Ledger Snapshot Store (synthetic)"
+    rpo_minutes: 480
+    rto_minutes: 120
+    required_steps:
+      - precheck
+      - restore_base
+      - verify_checksum
+      - publish_report
+    checksum_required: true
+    rowcount_required: false
+    owner_team: team-gamma
+    maintenance_window: "wed:01:00-02:00Z"
+    artifact_manifest_path: "artifacts"

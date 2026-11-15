@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+{% block title %}{{ dataset.dataset_id }} · DrillVerify{% endblock %}
+{% block content %}
+<p class="muted"><a href="{{ url_for('run_detail', run_pk=run.id) }}">Run {{ run.run_id }}</a> / dataset</p>
+<h1>{{ dataset.dataset_id }}</h1>
+<p class="lede">{{ dataset.display_name }} · owner {{ dataset.owner_team }} · status <span class="status status-{{ dataset.status }}">{{ dataset.status }}</span></p>
+
+<div class="cards">
+  <div class="card"><div class="label">Restorable points</div><div class="value">{{ dataset.point_count }}</div></div>
+  <div class="card"><div class="label">RPO target</div><div class="value">{{ dataset.rpo.rpo_minutes }}m</div></div>
+  <div class="card"><div class="label">Max gap</div><div class="value">{{ dataset.rpo.max_gap_minutes if dataset.rpo.max_gap_minutes is not none else 'n/a' }}</div></div>
+  <div class="card"><div class="label">Last point</div><div class="value small">{{ dataset.last_point_at or 'none' }}</div></div>
+  <div class="card"><div class="label">Material findings</div><div class="value">{{ dataset.material_finding_count }}</div></div>
+</div>
+
+<h2>Backup chain</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Backup</th><th>Finished</th><th>Chain</th><th>Artifact</th><th>Restorable</th><th>Failure rules</th></tr></thead>
+    <tbody>
+    {% for item in chains %}
+      <tr>
+        <td><code>{{ item.backup_id }}</code><br><span class="muted small">parent {{ item.parent_backup_id or '—' }}</span></td>
+        <td>{{ item.finished_at }}</td>
+        <td>{{ 'complete' if item.chain_complete else 'broken' }}</td>
+        <td>{{ 'ready' if item.artifact_ready else 'unusable' }}</td>
+        <td><span class="status status-{{ 'pass' if item.restorable else 'fail' }}">{{ 'yes' if item.restorable else 'no' }}</span></td>
+        <td class="small"><code>{{ item.failure_rules|join(', ') if item.failure_rules else '—' }}</code></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">No catalog backups for this dataset.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Restorable points</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Backup</th><th>Finished</th><th class="numeric">Rows</th><th>Schema</th><th>Data SHA-256</th></tr></thead>
+    <tbody>
+    {% for item in points %}
+      <tr>
+        <td><code>{{ item.backup_id }}</code></td>
+        <td>{{ item.finished_at }}</td>
+        <td class="numeric">{{ item.row_count }}</td>
+        <td>{{ item.schema_version }}</td>
+        <td><code>{{ item.data_sha256[:20] }}…</code></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">No restorable points.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Drills</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Drill</th><th>Backup</th><th>Status</th><th>Missing</th><th>Failed</th><th>Evidence</th><th>RTO</th></tr></thead>
+    <tbody>
+    {% for item in drills %}
+      {% set rto = report.objectives.rto|selectattr('drill_id', 'equalto', item.drill_id)|first %}
+      <tr>
+        <td><code>{{ item.drill_id }}</code></td>
+        <td><code>{{ item.backup_id }}</code></td>
+        <td><span class="status status-{{ 'pass' if item.status == 'success' else 'fail' }}">{{ item.status }}</span></td>
+        <td>{{ item.missing_steps|join(', ') if item.missing_steps else '—' }}</td>
+        <td>{{ item.failed_steps|join(', ') if item.failed_steps else '—' }}</td>
+        <td>{{ 'complete' if item.evidence_ok else 'gap' }}</td>
+        <td>{{ rto.status if rto else 'n/a' }} ({{ rto.duration_minutes if rto else '?' }}m)</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7">No drills for this dataset.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Findings</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Severity</th><th>Rule</th><th>Object</th><th>Message</th><th>Evidence</th></tr></thead>
+    <tbody>
+    {% for item in findings %}
+      <tr>
+        <td><span class="sev sev-{{ item.severity }}">{{ item.severity }}</span></td>
+        <td><code>{{ item.rule_id }}</code></td>
+        <td><code>{{ item.object_id }}</code></td>
+        <td>{{ item.message }}</td>
+        <td class="small muted">{{ item.file }}{% if item.line %}:{{ item.line }}{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">No findings for this dataset.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

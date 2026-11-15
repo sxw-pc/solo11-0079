@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}DrillVerify{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">Drill<span>Verify</span></div>
+    <span class="local-badge">local · read-only</span>
+    {% if run %}
+    <nav>
+      <a href="{{ url_for('run_detail', run_pk=run.id) }}">Run</a>
+      <a href="{{ url_for('findings', run_pk=run.id) }}">Findings</a>
+      <a href="{{ url_for('plan', run_pk=run.id) }}">Plan</a>
+    </nav>
+    {% endif %}
+  </div>
+</header>
+<main>
+  {% block content %}{% endblock %}
+</main>
+<footer>
+  Offline evidence review console. No write, execute or remote-network endpoints.
+</footer>
+</body>
+</html>

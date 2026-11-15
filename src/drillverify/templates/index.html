@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block title %}DrillVerify · Runs{% endblock %}
+{% block content %}
+<p class="muted">Offline restore-drill evidence verification</p>
+<h1>Verification runs</h1>
+<p class="lede">
+  Each row is an immutable audit ledger entry. The console reads from SQLite with a
+  query-only connection and exposes no mutation endpoints.
+</p>
+
+{% if runs %}
+<div class="panel">
+  <table>
+    <thead>
+      <tr><th>Ledger ID</th><th>Run ID</th><th>As of</th><th>Status</th><th class="numeric">Findings</th><th>Review</th></tr>
+    </thead>
+    <tbody>
+    {% for item in runs %}
+      <tr>
+        <td class="numeric">{{ item.id }}</td>
+        <td><code>{{ item.run_id }}</code></td>
+        <td>{{ item.as_of }}</td>
+        <td><span class="status status-{{ item.status }}">{{ item.status }}</span></td>
+        <td class="numeric">{{ item.summary.finding_count }}</td>
+        <td><a href="{{ url_for('run_detail', run_pk=item.id) }}">Open run</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  No ledger runs found. Run <code>make demo</code> from the repository root, then refresh.
+</div>
+{% endif %}
+{% endblock %}

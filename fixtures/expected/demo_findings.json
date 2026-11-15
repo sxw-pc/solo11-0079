@@ -1,0 +1,242 @@
+[
+  {
+    "object_id": "ds-ledger",
+    "object_type": "dataset",
+    "rule_id": "OBJ-POINT-001",
+    "severity": "critical"
+  },
+  {
+    "object_id": "bk-ledger-002",
+    "object_type": "backup",
+    "rule_id": "ART-001",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-ledger-002",
+    "object_type": "backup",
+    "rule_id": "ART-003",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-events-018",
+    "object_type": "backup",
+    "rule_id": "CHAIN-001",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-ledger-001",
+    "object_type": "backup",
+    "rule_id": "CHAIN-001",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-orders-900",
+    "object_type": "backup",
+    "rule_id": "CHAIN-001",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-events-018",
+    "object_type": "backup",
+    "rule_id": "CHAIN-002",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-ledger-001",
+    "object_type": "backup",
+    "rule_id": "CHAIN-002",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-orders-900",
+    "object_type": "backup",
+    "rule_id": "CHAIN-002",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-events-017",
+    "object_type": "backup",
+    "rule_id": "CHAIN-004",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-events-015",
+    "object_type": "backup",
+    "rule_id": "CHAIN-005",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-ledger-003",
+    "object_type": "backup",
+    "rule_id": "CHAIN-005",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-events-016",
+    "object_type": "backup",
+    "rule_id": "CHAIN-006",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-orders-901",
+    "object_type": "backup",
+    "rule_id": "CHAIN-006",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-ledger-003",
+    "object_type": "backup",
+    "rule_id": "CHAIN-009",
+    "severity": "high"
+  },
+  {
+    "object_id": "drill-orders-1106",
+    "object_type": "drill",
+    "rule_id": "CONS-001",
+    "severity": "high"
+  },
+  {
+    "object_id": "drill-orders-1106",
+    "object_type": "drill",
+    "rule_id": "CONS-002",
+    "severity": "high"
+  },
+  {
+    "object_id": "evidence/evidence-missing.txt",
+    "object_type": "evidence",
+    "rule_id": "EVID-001",
+    "severity": "high"
+  },
+  {
+    "object_id": "drill-ledger-0908",
+    "object_type": "drill",
+    "rule_id": "EVID-004",
+    "severity": "high"
+  },
+  {
+    "object_id": "drill-orders-1106",
+    "object_type": "drill",
+    "rule_id": "EVID-004",
+    "severity": "high"
+  },
+  {
+    "object_id": "drill-ledger-0908",
+    "object_type": "drill",
+    "rule_id": "EVID-005",
+    "severity": "high"
+  },
+  {
+    "object_id": "drill-orders-1106",
+    "object_type": "drill",
+    "rule_id": "EVID-005",
+    "severity": "high"
+  },
+  {
+    "object_id": "drill-ledger-0908",
+    "object_type": "drill",
+    "rule_id": "EVID-009",
+    "severity": "high"
+  },
+  {
+    "object_id": "ds-orders",
+    "object_type": "dataset",
+    "rule_id": "OBJ-RPO-001",
+    "severity": "high"
+  },
+  {
+    "object_id": "drill-orders-1106",
+    "object_type": "drill",
+    "rule_id": "OBJ-RTO-001",
+    "severity": "high"
+  },
+  {
+    "object_id": "bk-orders-905",
+    "object_type": "backup",
+    "rule_id": "IN-002",
+    "severity": "error"
+  },
+  {
+    "object_id": "bk-ledger-002",
+    "object_type": "backup",
+    "rule_id": "IN-005",
+    "severity": "error"
+  },
+  {
+    "object_id": "bk-ghost-001",
+    "object_type": "backup",
+    "rule_id": "IN-006",
+    "severity": "error"
+  },
+  {
+    "object_id": "drill-ghost-0001",
+    "object_type": "drill_event",
+    "rule_id": "IN-007",
+    "severity": "error"
+  },
+  {
+    "object_id": "bk-orders-903",
+    "object_type": "backup",
+    "rule_id": "IN-008",
+    "severity": "error"
+  },
+  {
+    "object_id": "bk-orders-902",
+    "object_type": "backup",
+    "rule_id": "IN-009",
+    "severity": "error"
+  },
+  {
+    "object_id": "drill-ledger-0908",
+    "object_type": "drill_event",
+    "rule_id": "IN-009",
+    "severity": "error"
+  },
+  {
+    "object_id": "bk-orders-904",
+    "object_type": "backup",
+    "rule_id": "IN-011",
+    "severity": "error"
+  },
+  {
+    "object_id": "line-25",
+    "object_type": "drill_event",
+    "rule_id": "IN-012",
+    "severity": "error"
+  },
+  {
+    "object_id": "drill-mismatch-01",
+    "object_type": "drill_event",
+    "rule_id": "IN-014",
+    "severity": "error"
+  },
+  {
+    "object_id": "drill-ledger-0908",
+    "object_type": "drill",
+    "rule_id": "CONS-004",
+    "severity": "medium"
+  },
+  {
+    "object_id": "drill-orders-1106",
+    "object_type": "drill",
+    "rule_id": "CONS-004",
+    "severity": "medium"
+  },
+  {
+    "object_id": "drill-ledger-0908",
+    "object_type": "drill",
+    "rule_id": "EVID-006",
+    "severity": "medium"
+  },
+  {
+    "object_id": "drill-orders-1106",
+    "object_type": "drill",
+    "rule_id": "EVID-007",
+    "severity": "warning"
+  },
+  {
+    "object_id": "drill-orders-0915",
+    "object_type": "drill",
+    "rule_id": "EVID-008",
+    "severity": "info"
+  }
+]

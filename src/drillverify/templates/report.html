@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DrillVerify Report {{ report.run_id }}</title>
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">Drill<span>Verify</span> Report</div>
+    <span class="local-badge">offline · self-contained</span>
+  </div>
+</header>
+<main>
+  <p class="muted">Deterministic restore-drill evidence verification</p>
+  <h1>Run <code>{{ report.run_id }}</code></h1>
+  <p class="lede">
+    As of <code>{{ report.as_of }}</code>. Analysis window starts
+    <code>{{ report.window_start }}</code>. The configured as-of timestamp is the only
+    report clock; no runtime clock or network input is used.
+  </p>
+
+  <div class="cards">
+    <div class="card"><div class="label">Status</div><div class="value status status-{{ report.status }}">{{ report.status }}</div></div>
+    <div class="card"><div class="label">Findings</div><div class="value">{{ report.summary.finding_count }}</div></div>
+    <div class="card"><div class="label">Restorable points</div><div class="value">{{ report.summary.restorable_point_count }}</div></div>
+    <div class="card"><div class="label">Successful drills</div><div class="value">{{ report.summary.successful_drill_count }}/{{ report.summary.drill_count }}</div></div>
+    <div class="card"><div class="label">Plan actions</div><div class="value">{{ report.summary.action_count }}</div></div>
+  </div>
+
+  <h2>Dataset verification</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Dataset</th><th>Status</th><th class="numeric">Points</th><th>RPO</th><th class="numeric">Max gap (min)</th><th>RTO states</th></tr></thead>
+      <tbody>
+      {% for item in report.datasets %}
+        <tr>
+          <td><strong>{{ item.dataset_id }}</strong><br><span class="muted small">{{ item.display_name }} · {{ item.owner_team }}</span></td>
+          <td><span class="status status-{{ item.status }}">{{ item.status }}</span></td>
+          <td class="numeric">{{ item.point_count }}</td>
+          <td><span class="status status-{{ 'pass' if item.rpo.status == 'pass' else 'fail' }}">{{ item.rpo.status }}</span><br><span class="small muted">target {{ item.rpo.rpo_minutes }} min</span></td>
+          <td class="numeric">{{ item.rpo.max_gap_minutes if item.rpo.max_gap_minutes is not none else 'n/a' }}</td>
+          <td>{{ item.rto_statuses|join(', ') if item.rto_statuses else 'none' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Findings</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Severity</th><th>Rule</th><th>Object</th><th>Message</th><th>Evidence</th></tr></thead>
+      <tbody>
+      {% for item in report.findings %}
+        <tr>
+          <td><span class="sev sev-{{ item.severity }}">{{ item.severity }}</span></td>
+          <td><code>{{ item.rule_id }}</code></td>
+          <td><code>{{ item.object_type }}:{{ item.object_id }}</code></td>
+          <td>{{ item.message }}</td>
+          <td class="small muted">{{ item.file }}{% if item.line %}:{{ item.line }}{% endif %}<br><code>{{ item.input_sha256[:16] }}</code></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5">No findings.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Remediation and re-drill plan</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Priority</th><th>Owner</th><th>Object</th><th>Rules</th><th>Due</th><th>Recommended action</th></tr></thead>
+      <tbody>
+      {% for action in report.remediation_plan.actions %}
+        <tr>
+          <td><span class="sev sev-{{ action.priority }}">{{ action.priority }}</span></td>
+          <td>{{ action.owner_team }}</td>
+          <td><code>{{ action.object_id }}</code></td>
+          <td><code>{{ action.rule_ids|join(', ') }}</code></td>
+          <td>{{ action.due_at }}</td>
+          <td>{{ action.title }}<br><span class="muted small">{{ action.instruction }}</span></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6">No remediation actions required.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Input integrity manifest</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>File</th><th>SHA-256</th><th class="numeric">Bytes</th></tr></thead>
+      <tbody>
+      {% for item in report.input_manifest %}
+        <tr><td>{{ item.path }}</td><td><code>{{ item.sha256 }}</code></td><td class="numeric">{{ item.size_bytes }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="small muted">
+    A failed drill is evidence about recovery readiness, not proof that source data is lost.
+    This report is read-only and contains no commands that modify source or backup systems.
+  </p>
+</main>
+<footer>DrillVerify {{ report.tool.version }} · rule and evidence references are stable for this run.</footer>
+</body>
+</html>

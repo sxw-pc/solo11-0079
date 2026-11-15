@@ -1,0 +1,7 @@
+{% extends "layout.html" %}
+{% block title %}Not found · DrillVerify{% endblock %}
+{% block content %}
+<h1>Not found</h1>
+<p class="lede">The requested run, dataset or view does not exist in this local ledger.</p>
+<p><a href="{{ url_for('index') }}">Return to runs</a></p>
+{% endblock %}

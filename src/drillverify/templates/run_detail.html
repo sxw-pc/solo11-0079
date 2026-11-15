@@ -1,0 +1,96 @@
+{% extends "layout.html" %}
+{% block title %}Run {{ run.run_id }} · DrillVerify{% endblock %}
+{% block content %}
+<p class="muted">Run detail</p>
+<h1><code>{{ run.run_id }}</code></h1>
+<p class="lede">
+  As of <code>{{ report.as_of }}</code>; window start <code>{{ report.window_start }}</code>.
+  Configured <code>as_of</code> is the only report clock.
+</p>
+
+<div class="cards">
+  <div class="card"><div class="label">Status</div><div class="value status status-{{ report.status }}">{{ report.status }}</div></div>
+  <div class="card"><div class="label">Findings</div><div class="value">{{ report.summary.finding_count }}</div></div>
+  <div class="card"><div class="label">Datasets</div><div class="value">{{ report.summary.dataset_count }}</div></div>
+  <div class="card"><div class="label">Restorable points</div><div class="value">{{ report.summary.restorable_point_count }}</div></div>
+  <div class="card"><div class="label">Actions</div><div class="value">{{ report.summary.action_count }}</div></div>
+</div>
+
+<h2>Dataset posture</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Dataset</th><th>Status</th><th class="numeric">Points</th><th>RPO</th><th>RTO states</th><th>Owner</th><th></th></tr></thead>
+    <tbody>
+    {% for item in report.datasets %}
+      <tr>
+        <td><strong>{{ item.dataset_id }}</strong><br><span class="muted small">{{ item.display_name }}</span></td>
+        <td><span class="status status-{{ item.status }}">{{ item.status }}</span></td>
+        <td class="numeric">{{ item.point_count }}</td>
+        <td><span class="status status-{{ 'pass' if item.rpo.status == 'pass' else 'fail' }}">{{ item.rpo.status }}</span></td>
+        <td>{{ item.rto_statuses|join(', ') if item.rto_statuses else 'none' }}</td>
+        <td>{{ item.owner_team }}</td>
+        <td><a href="{{ url_for('dataset_detail', run_pk=run.id, dataset_id=item.dataset_id) }}">Inspect</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Recovery objectives</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Dataset</th><th>RPO status</th><th class="numeric">Target (min)</th><th class="numeric">Max gap (min)</th><th class="numeric">Points</th></tr></thead>
+    <tbody>
+    {% for item in report.objectives.rpo %}
+      <tr>
+        <td>{{ item.dataset_id }}</td>
+        <td><span class="status status-{{ 'pass' if item.status == 'pass' else 'fail' }}">{{ item.status }}</span></td>
+        <td class="numeric">{{ item.rpo_minutes }}</td>
+        <td class="numeric">{{ item.max_gap_minutes if item.max_gap_minutes is not none else 'n/a' }}</td>
+        <td class="numeric">{{ item.point_count }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Drill outcomes</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Drill</th><th>Dataset</th><th>Status</th><th>RTO status</th><th class="numeric">Duration</th><th class="numeric">Target</th></tr></thead>
+    <tbody>
+    {% for item in report.drills %}
+      {% set rto = report.objectives.rto|selectattr('drill_id', 'equalto', item.drill_id)|first %}
+      <tr>
+        <td><code>{{ item.drill_id }}</code></td>
+        <td>{{ item.dataset_id }}</td>
+        <td><span class="status status-{{ 'pass' if item.status == 'success' else 'fail' }}">{{ item.status }}</span></td>
+        <td>{{ rto.status if rto else 'n/a' }}</td>
+        <td class="numeric">{{ rto.duration_minutes if rto else 'n/a' }}</td>
+        <td class="numeric">{{ rto.rto_minutes if rto else 'n/a' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Top findings</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Severity</th><th>Rule</th><th>Object</th><th>Message</th></tr></thead>
+    <tbody>
+    {% for item in report.findings[:20] %}
+      <tr>
+        <td><span class="sev sev-{{ item.severity }}">{{ item.severity }}</span></td>
+        <td><code>{{ item.rule_id }}</code></td>
+        <td><code>{{ item.object_id }}</code></td>
+        <td>{{ item.message }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4">No findings.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p><a href="{{ url_for('findings', run_pk=run.id) }}">All findings →</a> · <a href="{{ url_for('plan', run_pk=run.id) }}">Remediation plan →</a></p>
+</div>
+{% endblock %}

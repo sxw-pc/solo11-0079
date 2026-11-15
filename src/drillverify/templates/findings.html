@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block title %}Findings {{ run.run_id }} · DrillVerify{% endblock %}
+{% block content %}
+<p class="muted"><a href="{{ url_for('run_detail', run_pk=run.id) }}">Run {{ run.run_id }}</a> / findings</p>
+<h1>Findings</h1>
+<p class="lede">Every row retains a rule ID, object ID, source line and input SHA-256. Filtering is read-only.</p>
+
+<form class="panel" method="get" action="{{ url_for('findings', run_pk=run.id) }}">
+  <label for="severity" class="small muted">Severity</label>
+  <select id="severity" name="severity">
+    <option value="">all</option>
+    {% for item in ['critical', 'high', 'error', 'medium', 'warning', 'low', 'info'] %}
+      <option value="{{ item }}" {% if selected_severity == item %}selected{% endif %}>{{ item }}</option>
+    {% endfor %}
+  </select>
+  <label for="q" class="small muted">Search</label>
+  <input id="q" name="q" value="{{ query }}" maxlength="120" placeholder="rule, object, message">
+  <button type="submit">Filter</button>
+  <a class="small" href="{{ url_for('findings', run_pk=run.id) }}">Reset</a>
+</form>
+
+<div class="panel">
+  <table>
+    <thead><tr><th>Severity</th><th>Rule</th><th>Category</th><th>Object</th><th>Message</th><th>Evidence</th></tr></thead>
+    <tbody>
+    {% for item in findings %}
+      <tr>
+        <td><span class="sev sev-{{ item.severity }}">{{ item.severity }}</span></td>
+        <td><code>{{ item.rule_id }}</code></td>
+        <td class="small">{{ item.category }}</td>
+        <td><code>{{ item.object_type }}:{{ item.object_id }}</code></td>
+        <td>{{ item.message }}{% if item.evidence %}<br><span class="small muted"><code>{{ item.evidence|tojson }}</code></span>{% endif %}</td>
+        <td class="small muted">{{ item.file }}{% if item.line %}:{{ item.line }}{% endif %}<br><code>{{ item.input_sha256[:16] }}</code></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">No findings match the filter.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
