@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .generations import analyse_generations
 from .models import Finding, RecoveryPlan
 from .records import ArtifactManifest, BackupRecord, DrillEvent
 from .results import BackupChainResult, DrillSummary
@@ -14,7 +15,7 @@ from .results import BackupChainResult, DrillSummary
 class DrillAssessment:
     summaries: tuple[DrillSummary, ...]
     findings: tuple[Finding, ...]
-    success: dict[str, bool]
+    status: dict[str, str]
 
 
 def _effective(events: list[DrillEvent]) -> dict[str, DrillEvent]:
@@ -50,7 +51,7 @@ def assess_drills(
     drill_path: str,
     drill_hash: str,
 ) -> DrillAssessment:
-    """Check mandatory steps, evidence, restorability and reconciliation values."""
+    """Check mandatory steps, evidence, restorability, reconciliation and generations."""
     datasets = plan.dataset_map()
     backups_by_id = {item.backup_id: item for item in backups}
     chain_by_id = {item.backup_id: item for item in chains}
@@ -59,7 +60,7 @@ def assess_drills(
         grouped.setdefault(event.drill_id, []).append(event)
     summaries: list[DrillSummary] = []
     findings: list[Finding] = []
-    success: dict[str, bool] = {}
+    status_by_drill: dict[str, str] = {}
 
     for drill_id in sorted(grouped):
         drill_events = sorted(grouped[drill_id], key=lambda item: (item.started_at, item.step, item.attempt))
@@ -77,87 +78,42 @@ def assess_drills(
         consistency_ok = True
 
         if missing:
-            findings.append(
-                _finding(
-                    "EVID-004",
-                    "high",
-                    drill_id,
-                    "Required drill steps are missing.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    missing_steps=missing,
-                    required_steps=list(dataset.required_steps),
-                )
-            )
+            findings.append(_finding(
+                "EVID-004", "high", drill_id, "Required drill steps are missing.",
+                drill_path, first_line, drill_hash,
+                missing_steps=missing, required_steps=list(dataset.required_steps),
+            ))
         if failed:
-            findings.append(
-                _finding(
-                    "EVID-005",
-                    "high",
-                    drill_id,
-                    "Required drill steps failed.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    failed_steps=failed,
-                )
-            )
+            findings.append(_finding(
+                "EVID-005", "high", drill_id, "Required drill steps failed.",
+                drill_path, first_line, drill_hash, failed_steps=failed,
+            ))
         if skipped:
-            findings.append(
-                _finding(
-                    "EVID-006",
-                    "medium",
-                    drill_id,
-                    "Required drill steps were skipped.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    skipped_steps=skipped,
-                )
-            )
+            findings.append(_finding(
+                "EVID-006", "medium", drill_id, "Required drill steps were skipped.",
+                drill_path, first_line, drill_hash, skipped_steps=skipped,
+            ))
         retries = sorted(step for step in {event.step for event in drill_events} if sum(
             1 for event in drill_events if event.step == step
         ) > 1)
         if retries:
-            findings.append(
-                _finding(
-                    "EVID-007",
-                    "warning",
-                    drill_id,
-                    "Drill retried one or more steps; wall-clock RTO includes retries.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    retried_steps=retries,
-                )
-            )
+            findings.append(_finding(
+                "EVID-007", "warning", drill_id,
+                "Drill retried one or more steps; wall-clock RTO includes retries.",
+                drill_path, first_line, drill_hash, retried_steps=retries,
+            ))
         if unexpected:
-            findings.append(
-                _finding(
-                    "EVID-008",
-                    "info",
-                    drill_id,
-                    "Drill contains steps outside the required procedure.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    unexpected_steps=unexpected,
-                )
-            )
+            findings.append(_finding(
+                "EVID-008", "info", drill_id,
+                "Drill contains steps outside the required procedure.",
+                drill_path, first_line, drill_hash, unexpected_steps=unexpected,
+            ))
         if not backup_ready:
-            findings.append(
-                _finding(
-                    "EVID-009",
-                    "high",
-                    drill_id,
-                    "Drill references a backup that is not a restorable point.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    backup_id=backup.backup_id,
-                )
-            )
+            findings.append(_finding(
+                "EVID-009", "high", drill_id,
+                "Drill references a backup that is not a restorable point.",
+                drill_path, first_line, drill_hash, backup_id=backup.backup_id,
+            ))
 
         manifest = manifests.get(backup.backup_id)
         expected_rows = manifest.row_count if manifest else backup.row_count
@@ -166,94 +122,94 @@ def assess_drills(
         sha_event = effective.get("verify_checksum")
         if row_event and row_event.rows_restored is not None and row_event.rows_restored != expected_rows:
             consistency_ok = False
-            findings.append(
-                _finding(
-                    "CONS-001",
-                    "high",
-                    drill_id,
-                    "Restored row count does not match the artifact manifest.",
-                    drill_path,
-                    row_event.line_no,
-                    drill_hash,
-                    backup_id=backup.backup_id,
-                    expected=expected_rows,
-                    actual=row_event.rows_restored,
-                )
-            )
+            findings.append(_finding(
+                "CONS-001", "high", drill_id,
+                "Restored row count does not match the artifact manifest.",
+                drill_path, row_event.line_no, drill_hash,
+                backup_id=backup.backup_id, expected=expected_rows, actual=row_event.rows_restored,
+            ))
         if sha_event and sha_event.reported_sha256 is not None and expected_sha is not None:
             if sha_event.reported_sha256 != expected_sha:
                 consistency_ok = False
-                findings.append(
-                    _finding(
-                        "CONS-002",
-                        "high",
-                        drill_id,
-                        "Restored checksum does not match the artifact manifest.",
-                        drill_path,
-                        sha_event.line_no,
-                        drill_hash,
-                        backup_id=backup.backup_id,
-                        expected=expected_sha,
-                        actual=sha_event.reported_sha256,
-                    )
-                )
+                findings.append(_finding(
+                    "CONS-002", "high", drill_id,
+                    "Restored checksum does not match the artifact manifest.",
+                    drill_path, sha_event.line_no, drill_hash,
+                    backup_id=backup.backup_id, expected=expected_sha, actual=sha_event.reported_sha256,
+                ))
         if dataset.rowcount_required and not (
             row_event and row_event.rows_restored is not None and row_event.status == "success"
         ):
             consistency_ok = False
-            findings.append(
-                _finding(
-                    "CONS-003",
-                    "medium",
-                    drill_id,
-                    "A required row-count verification value is unavailable.",
-                    drill_path,
-                    row_event.line_no if row_event else first_line,
-                    drill_hash,
-                )
-            )
+            findings.append(_finding(
+                "CONS-003", "medium", drill_id,
+                "A required row-count verification value is unavailable.",
+                drill_path, row_event.line_no if row_event else first_line, drill_hash,
+            ))
         if dataset.checksum_required and not (
             sha_event and sha_event.reported_sha256 is not None and sha_event.status == "success"
         ):
             consistency_ok = False
-            findings.append(
-                _finding(
-                    "CONS-004",
-                    "medium",
-                    drill_id,
-                    "A required checksum verification value is unavailable.",
-                    drill_path,
-                    sha_event.line_no if sha_event else first_line,
-                    drill_hash,
-                )
-            )
+            findings.append(_finding(
+                "CONS-004", "medium", drill_id,
+                "A required checksum verification value is unavailable.",
+                drill_path, sha_event.line_no if sha_event else first_line, drill_hash,
+            ))
 
-        drill_ok = (
-            not missing
-            and not failed
-            and not skipped
-            and evidence_ok
-            and backup_ready
-            and consistency_ok
+        gen_state = analyse_generations(
+            drill_id,
+            drill_events,
+            dataset.required_steps,
+            valid_evidence,
+            plan.evidence_policy == "reuse",
         )
-        success[drill_id] = drill_ok
+        for step in gen_state.unbound_steps:
+            event = effective[step]
+            findings.append(_finding(
+                "CONS-005", "high", drill_id,
+                "Verification evidence is not bound to the current recovery generation.",
+                drill_path, event.line_no, drill_hash,
+                step=step, attempt=event.attempt, recovery_gen=event.recovery_gen,
+                current_gen=gen_state.current_gen,
+            ))
+        if gen_state.chain_unbound:
+            apply_event = effective.get("apply_incremental")
+            findings.append(_finding(
+                "CONS-006", "high", drill_id,
+                "Incremental apply is not bound to the current recovery generation.",
+                drill_path, apply_event.line_no if apply_event else first_line, drill_hash,
+                current_gen=gen_state.current_gen,
+            ))
+
+        hard_fail = (
+            missing or failed or skipped or not evidence_ok or not backup_ready or not consistency_ok
+        )
+        if hard_fail:
+            status = "failed"
+        elif gen_state.unbound_steps or gen_state.chain_unbound:
+            status = "unverified"
+        else:
+            status = "success"
+        status_by_drill[drill_id] = status
         summaries.append(
             DrillSummary(
                 drill_id=drill_id,
                 dataset_id=dataset.dataset_id,
                 backup_id=backup.backup_id,
-                status="success" if drill_ok else "failed",
+                status=status,
                 step_count=len(drill_events),
                 required_step_count=len(dataset.required_steps),
                 missing_steps=tuple(missing),
                 failed_steps=tuple(failed),
                 skipped_steps=tuple(skipped),
                 evidence_ok=evidence_ok,
+                recovery_gen=gen_state.current_gen,
+                evidence_decisions=gen_state.decisions,
             )
         )
 
     return DrillAssessment(
         tuple(sorted(summaries, key=lambda item: item.drill_id)),
         tuple(sorted(findings, key=Finding.sort_key)),
-        success,
+        status_by_drill,
     )

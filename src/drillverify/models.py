@@ -102,6 +102,7 @@ class RecoveryPlan:
     analysis_window_days: int
     datasets: tuple[DatasetConfig, ...]
     plan_path: str
+    evidence_policy: str = "strict"
 
     @property
     def window_start(self) -> datetime:
@@ -119,4 +120,5 @@ class RecoveryPlan:
             "window_start": format_utc(self.window_start),
             "datasets": [dataset.to_dict() for dataset in self.datasets],
             "plan_path": self.plan_path,
+            "evidence_policy": self.evidence_policy,
         }

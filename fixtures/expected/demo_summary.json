@@ -96,16 +96,6 @@
       ]
     },
     {
-      "action_id": "209426694bc7",
-      "object_id": "drill-orders-1106",
-      "priority": "high",
-      "rule_ids": [
-        "CONS-001",
-        "CONS-002",
-        "CONS-004"
-      ]
-    },
-    {
       "action_id": "45ee8bb9373b",
       "object_id": "bk-orders-901",
       "priority": "high",
@@ -128,6 +118,18 @@
       "priority": "high",
       "rule_ids": [
         "OBJ-RTO-001"
+      ]
+    },
+    {
+      "action_id": "8fe370c0e9ee",
+      "object_id": "drill-orders-1106",
+      "priority": "high",
+      "rule_ids": [
+        "CONS-001",
+        "CONS-002",
+        "CONS-004",
+        "CONS-005",
+        "CONS-006"
       ]
     },
     {
@@ -255,11 +257,11 @@
     "backup_count": 63,
     "dataset_count": 3,
     "drill_count": 4,
-    "finding_count": 40,
+    "finding_count": 42,
     "finding_counts": {
       "critical": 1,
       "error": 10,
-      "high": 24,
+      "high": 26,
       "info": 1,
       "medium": 3,
       "warning": 1
@@ -270,6 +272,7 @@
     "rpo_breaches": 2,
     "rto_breaches": 1,
     "successful_drill_count": 2,
+    "unverified_drill_count": 0,
     "validation_rejected_rows": 9
   }
 }

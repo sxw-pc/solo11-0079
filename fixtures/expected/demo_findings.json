@@ -102,6 +102,18 @@
     "severity": "high"
   },
   {
+    "object_id": "drill-orders-1106",
+    "object_type": "drill",
+    "rule_id": "CONS-005",
+    "severity": "high"
+  },
+  {
+    "object_id": "drill-orders-1106",
+    "object_type": "drill",
+    "rule_id": "CONS-006",
+    "severity": "high"
+  },
+  {
     "object_id": "evidence/evidence-missing.txt",
     "object_type": "evidence",
     "rule_id": "EVID-001",

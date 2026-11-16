@@ -124,6 +124,11 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
         issue("CFG-001", "analysis_window_days must be an integer from 1 to 365.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
 
+    policy = raw.get("evidence_policy", "strict")
+    if policy not in {"strict", "reuse"}:
+        issue("CFG-001", "evidence_policy must be 'strict' or 'reuse'.", rel_path)
+        return PlanLoad(None, tuple(findings), fingerprint)
+
     datasets_raw = raw.get("datasets")
     if not isinstance(datasets_raw, list) or not datasets_raw:
         issue("CFG-003", "At least one dataset declaration is required.", rel_path)
@@ -220,5 +225,6 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
         analysis_window_days=window,
         datasets=tuple(sorted(datasets, key=lambda item: item.dataset_id)),
         plan_path=rel_path,
+        evidence_policy=policy,
     )
     return PlanLoad(plan, tuple(sorted(findings, key=Finding.sort_key)), fingerprint)

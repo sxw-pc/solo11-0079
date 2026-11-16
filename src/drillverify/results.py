@@ -90,6 +90,7 @@ class RtoResult:
     started_at: str
     finished_at: str
     successful: bool
+    drill_status: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -102,6 +103,31 @@ class RtoResult:
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "successful": self.successful,
+            "drill_status": self.drill_status,
+        }
+
+
+@dataclass(frozen=True)
+class EvidenceDecision:
+    """One audited adopt/invalidate decision for a successful step event."""
+
+    drill_id: str
+    step: str
+    attempt: int
+    line_no: int
+    decision: str
+    reason: str
+    recovery_gen: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "drill_id": self.drill_id,
+            "step": self.step,
+            "attempt": self.attempt,
+            "line": self.line_no,
+            "decision": self.decision,
+            "reason": self.reason,
+            "recovery_gen": self.recovery_gen,
         }
 
 
@@ -117,6 +143,8 @@ class DrillSummary:
     failed_steps: tuple[str, ...]
     skipped_steps: tuple[str, ...]
     evidence_ok: bool
+    recovery_gen: str | None
+    evidence_decisions: tuple[EvidenceDecision, ...]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -130,4 +158,6 @@ class DrillSummary:
             "failed_steps": list(self.failed_steps),
             "skipped_steps": list(self.skipped_steps),
             "evidence_ok": self.evidence_ok,
+            "recovery_gen": self.recovery_gen,
+            "evidence_decisions": [item.to_dict() for item in self.evidence_decisions],
         }

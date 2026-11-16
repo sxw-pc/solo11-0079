@@ -115,11 +115,15 @@ def evaluate_rpo(
 def evaluate_rto(
     plan: RecoveryPlan,
     events: tuple[DrillEvent, ...],
-    drill_success: Mapping[str, bool],
+    drill_status: Mapping[str, str],
     drill_path: str,
     drill_hash: str,
 ) -> tuple[tuple[RtoResult, ...], tuple[Finding, ...]]:
-    """Measure wall-clock drill duration including failed attempts."""
+    """Measure wall-clock drill duration including failed attempts.
+
+    Only a drill assessed "success" (same-generation evidence included) may
+    pass; "failed" and "unverified" drills are "not_met" even inside target.
+    """
     datasets = plan.dataset_map()
     grouped: dict[str, list[DrillEvent]] = {}
     for event in events:
@@ -134,7 +138,8 @@ def evaluate_rto(
         backup_id = drill_events[0].backup_id
         duration = minutes_between(started, finished)
         target = datasets[dataset_id].rto_minutes
-        successful = bool(drill_success.get(drill_id, False))
+        status_label = drill_status.get(drill_id, "failed")
+        successful = status_label == "success"
         if duration > target:
             status = "breach"
         elif successful:
@@ -152,6 +157,7 @@ def evaluate_rto(
                 started_at=format_utc(started),
                 finished_at=format_utc(finished),
                 successful=successful,
+                drill_status=status_label,
             )
         )
         if duration > target:
@@ -170,6 +176,7 @@ def evaluate_rto(
                         "started_at": format_utc(started),
                         "finished_at": format_utc(finished),
                         "successful": successful,
+                        "drill_status": status_label,
                     },
                     drill_hash,
                 )

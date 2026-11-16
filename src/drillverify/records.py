@@ -56,6 +56,8 @@ class DrillEvent:
     rows_restored: int | None
     reported_sha256: str | None
     line_no: int
+    recovery_gen: str | None = None
+    verified_digest: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,6 +73,8 @@ class DrillEvent:
             "detail": self.detail,
             "rows_restored": self.rows_restored,
             "reported_sha256": self.reported_sha256,
+            "recovery_gen": self.recovery_gen,
+            "verified_digest": self.verified_digest,
             "line": self.line_no,
         }
 

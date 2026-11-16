@@ -196,7 +196,7 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
     rto, rto_findings = evaluate_rto(
         plan,
         drills.events,
-        drill_assessment.success,
+        drill_assessment.status,
         drill_load.path,
         drill_hash,
     )
@@ -255,6 +255,9 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         "drill_count": len(drill_assessment.summaries),
         "successful_drill_count": sum(
             1 for item in drill_assessment.summaries if item.status == "success"
+        ),
+        "unverified_drill_count": sum(
+            1 for item in drill_assessment.summaries if item.status == "unverified"
         ),
         "rpo_breaches": sum(1 for item in rpo if item.status in {"breach", "no_points"}),
         "rto_breaches": sum(1 for item in rto if item.status == "breach"),

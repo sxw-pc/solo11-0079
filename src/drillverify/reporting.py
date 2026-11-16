@@ -99,6 +99,13 @@ def render_markdown(report: dict[str, Any]) -> str:
         )
     if len(report["findings"]) > 40:
         lines.append(f"|  |  |  | _and {len(report['findings']) - 40} more in report.json_ |")
+    lines.extend(["", "## Drill Evidence Decisions", "", "| Drill | Step | Attempt | Decision | Reason |", "|---|---|---:|---|---|"])
+    for drill in report["drills"]:
+        for item in drill.get("evidence_decisions", []):
+            lines.append(
+                f"| {_cell(drill['drill_id'])} | {_cell(item['step'])} | {item['attempt']} | "
+                f"{item['decision']} | {_cell(item['reason'])} |"
+            )
     lines.extend(["", "## Remediation Plan", "", "| Priority | Owner | Rule(s) | Object | Due | Action |", "|---|---|---|---|---|---|"])
     for action in report["remediation_plan"]["actions"]:
         lines.append(

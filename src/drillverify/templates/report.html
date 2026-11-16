@@ -69,6 +69,30 @@
     </table>
   </div>
 
+  <h2>Drill evidence decisions</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Drill</th><th>Status</th><th>Generation</th><th>Step</th><th class="numeric">Attempt</th><th>Decision</th><th>Reason</th></tr></thead>
+      <tbody>
+      {% for drill in report.drills %}
+        {% for item in drill.evidence_decisions %}
+        <tr>
+          <td><code>{{ drill.drill_id }}</code></td>
+          <td><span class="status status-{{ 'pass' if drill.status == 'success' else 'fail' }}">{{ drill.status }}</span></td>
+          <td>{{ drill.recovery_gen or 'n/a' }}</td>
+          <td>{{ item.step }}</td>
+          <td class="numeric">{{ item.attempt }}</td>
+          <td>{{ item.decision }}</td>
+          <td class="small muted">{{ item.reason }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="7">No drills recorded.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
   <h2>Remediation and re-drill plan</h2>
   <div class="panel">
     <table>

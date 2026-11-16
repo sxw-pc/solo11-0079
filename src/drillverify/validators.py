@@ -12,6 +12,7 @@ from .timeutil import TimestampError, parse_utc
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]{2,63}$")
 _STEP_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
 _SHA_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+_GEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
 _EVENT_FIELDS = (
     "drill_id",
     "dataset_id",
@@ -42,15 +43,14 @@ class DrillValidation:
 def _as_int(value: object, *, minimum: int = 0) -> int | None:
     if isinstance(value, bool):
         return None
-    if isinstance(value, int):
-        return value if value >= minimum else None
     if isinstance(value, str):
         try:
-            parsed = int(value.strip(), 10)
+            value = int(value.strip(), 10)
         except ValueError:
             return None
-        return parsed if parsed >= minimum else None
-    return None
+    if not isinstance(value, int):
+        return None
+    return value if value >= minimum else None
 def validate_catalog(
     loaded: LoadedRows,
     plan: RecoveryPlan,
@@ -133,31 +133,17 @@ def validate_catalog(
         if size == 0:
             findings.append(
                 Finding(
-                    "IN-003",
-                    "warning",
-                    "backup",
-                    backup_id,
+                    "IN-003", "warning", "backup", backup_id,
                     "Artifact size is zero; verify the synthetic artifact is intentional.",
-                    loaded.path,
-                    line_no,
-                    {"artifact_size_bytes": 0},
-                    file_hash,
+                    loaded.path, line_no, {"artifact_size_bytes": 0}, file_hash,
                 )
             )
         records.append(
             BackupRecord(
-                dataset_id=dataset_id,
-                backup_id=backup_id,
-                parent_backup_id=parent,
-                backup_type=backup_type,
-                started_at=started,
-                finished_at=finished,
-                artifact_path=artifact_rel,
-                artifact_size_bytes=size,
-                sha256=digest.lower(),
-                row_count=rows,
-                schema_version=schema_version,
-                line_no=line_no,
+                dataset_id=dataset_id, backup_id=backup_id, parent_backup_id=parent,
+                backup_type=backup_type, started_at=started, finished_at=finished,
+                artifact_path=artifact_rel, artifact_size_bytes=size, sha256=digest.lower(),
+                row_count=rows, schema_version=schema_version, line_no=line_no,
             )
         )
     ordered = sorted(records, key=lambda item: (item.dataset_id, item.finished_at, item.backup_id))
@@ -182,6 +168,12 @@ def validate_drills(
     findings = list(loaded.findings)
     events: list[DrillEvent] = []
     identities: dict[str, tuple[str, str]] = {}
+    declared_gens: dict[str, set[str]] = {}
+    for _, raw in loaded.rows:
+        gen = raw.get("recovery_gen")
+        if str(raw.get("step", "")).strip() == "restore_base" and isinstance(gen, str):
+            if _GEN_RE.fullmatch(gen.strip()):
+                declared_gens.setdefault(str(raw.get("drill_id", "")).strip(), set()).add(gen.strip())
     def issue(rule: str, object_id: str, message: str, line: int, **evidence: Any) -> None:
         findings.append(
             Finding(rule, "error", "drill_event", object_id, message, loaded.path, line, evidence, file_hash)
@@ -208,12 +200,8 @@ def validate_drills(
             continue
         if backup.dataset_id != dataset_id:
             issue(
-                "IN-014",
-                drill_id,
-                "Drill dataset does not own the referenced backup.",
-                line_no,
-                backup_id=backup_id,
-                dataset_id=dataset_id,
+                "IN-014", drill_id, "Drill dataset does not own the referenced backup.",
+                line_no, backup_id=backup_id, dataset_id=dataset_id,
             )
             continue
         if not _STEP_RE.fullmatch(step):
@@ -258,6 +246,29 @@ def validate_drills(
                 issue("IN-011", drill_id, "reported_sha256 must be null or 64 hex characters.", line_no)
                 continue
             reported = reported.lower()
+        recovery_gen = raw.get("recovery_gen")
+        if recovery_gen is not None:
+            recovery_gen = str(recovery_gen).strip()
+            if not _GEN_RE.fullmatch(recovery_gen):
+                issue("IN-016", drill_id, "recovery_gen has an invalid format.", line_no)
+                continue
+        verified_digest = raw.get("verified_digest")
+        if verified_digest is not None:
+            verified_digest = str(verified_digest).strip()
+            if not _SHA_RE.fullmatch(verified_digest):
+                issue("IN-011", drill_id, "verified_digest must be null or 64 hex characters.", line_no)
+                continue
+            verified_digest = verified_digest.lower()
+        if verified_digest is not None and recovery_gen is None:
+            issue("IN-017", drill_id, "verified_digest requires a recovery_gen.", line_no)
+            continue
+        if recovery_gen is not None and recovery_gen not in declared_gens.get(drill_id, ()):
+            issue(
+                "IN-018", drill_id,
+                f"recovery_gen {recovery_gen!r} is not declared by any restore_base in this drill.",
+                line_no,
+            )
+            continue
         detail = raw.get("detail")
         if not isinstance(detail, str):
             issue("IN-003", drill_id, "detail must be a string.", line_no)
@@ -270,19 +281,11 @@ def validate_drills(
             continue
         events.append(
             DrillEvent(
-                drill_id=drill_id,
-                dataset_id=dataset_id,
-                backup_id=backup_id,
-                step=step,
-                status=status,
-                attempt=attempt,
-                started_at=started,
-                finished_at=finished,
-                evidence_ref=evidence_ref,
-                detail=detail,
-                rows_restored=rows_restored,
-                reported_sha256=reported,
-                line_no=line_no,
+                drill_id=drill_id, dataset_id=dataset_id, backup_id=backup_id, step=step,
+                status=status, attempt=attempt, started_at=started, finished_at=finished,
+                evidence_ref=evidence_ref, detail=detail, rows_restored=rows_restored,
+                reported_sha256=reported, line_no=line_no,
+                recovery_gen=recovery_gen, verified_digest=verified_digest,
             )
         )
     ordered = sorted(events, key=lambda item: (item.drill_id, item.started_at, item.step, item.attempt))
