@@ -7,6 +7,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from .ledger_schedule import create_schedule_schema, write_schedule
 from .pipeline import RunBundle
 from .rules import category_for
 
@@ -89,6 +90,7 @@ def _write_connection(path: Path) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     connection.executescript(_SCHEMA)
+    create_schedule_schema(connection)
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     return connection
 
@@ -182,6 +184,7 @@ def record_run(db_path: Path, bundle: RunBundle, report: dict[str, Any]) -> int:
                     for item in bundle.actions
                 ],
             )
+            write_schedule(connection, run_pk, bundle.schedule)
         return run_pk
     finally:
         connection.close()
@@ -275,3 +278,13 @@ def get_actions(db_path: Path, run_pk: int) -> list[dict[str, Any]]:
         return [json.loads(row["payload_json"]) for row in rows]
     finally:
         connection.close()
+
+
+def get_schedule_rows(
+    db_path: Path, run_pk: int, objective: str | None = None
+) -> dict[str, Any]:
+    """Read the normalized schedule for one objective from the ledger."""
+    from .ledger_schedule import get_schedule
+
+    _read_connection(db_path).close()  # prove the ledger exists before reading
+    return get_schedule(db_path, run_pk, objective)

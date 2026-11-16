@@ -19,6 +19,7 @@ def test_repeated_pipeline_is_byte_deterministic(fixtures_root: Path, bundle):
     assert [item.to_dict() for item in repeated.actions] == [
         item.to_dict() for item in bundle.actions
     ]
+    assert repeated.schedule.to_dict() == bundle.schedule.to_dict()
     assert build_report(repeated) == build_report(bundle)
 
 

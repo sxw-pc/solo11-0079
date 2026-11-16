@@ -7,7 +7,7 @@ from typing import Any
 
 from flask import Flask, abort, render_template, request
 
-from .ledger import get_actions, get_findings, get_run, list_runs
+from .ledger import get_actions, get_findings, get_run, get_schedule_rows, list_runs
 
 ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -121,12 +121,17 @@ def create_app(db_path: Path) -> Flask:
     @app.get("/runs/<int:run_pk>/plan")
     def plan(run_pk: int) -> str:
         run = _run_or_404(db_path, run_pk)
+        report = run["report"]
+        selected = report["remediation_plan"]["schedule"]["selected_objective"]
         actions = get_actions(db_path, run_pk)
+        schedule = get_schedule_rows(db_path, run_pk, selected or None)
         return render_template(
             "plan.html",
             run=run,
-            report=run["report"],
+            report=report,
             actions=actions,
+            schedule=schedule,
+            schedule_summary=report["remediation_plan"]["schedule"],
         )
 
     @app.errorhandler(404)

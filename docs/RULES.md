@@ -16,6 +16,7 @@ use `critical`, `high`, `medium`, or `info`.
 | `CFG-002` | error | Duplicate dataset declaration |
 | `CFG-003` | error | No usable dataset declaration |
 | `CFG-004` | error | Artifact manifest path escapes the fixture root |
+| `CFG-005` | error | Remediation-scheduling declaration is invalid |
 
 A plan with fatal configuration findings cannot produce a run. A duplicate or
 unsafe dataset declaration is rejected while other valid datasets continue.
@@ -117,3 +118,19 @@ Material findings (`critical`, `high`, `error`, `medium`) are grouped by categor
 owner, dataset and object. Each action receives a stable content-derived ID, SLA
 due date (`as_of` + 1/3/7 days for critical/high+error/medium), owner and all
 source rule IDs. Warnings and informational findings never create actions.
+
+## Remediation scheduling
+
+Scheduling consumes those stable action IDs and never re-groups them. It reports
+for each objective:
+
+- scheduled actions with start/end UTC, slot indexes, maintenance window,
+  impact minutes, overdue status and a delay reason
+  (`dependency_delay`, `capacity_delay` or empty);
+- unscheduled actions with a stable reason code and the detail that explains it;
+- `overdue_high_count`, `overdue_total_count` and `total_impact_minutes`;
+- whether the objective's schedule was proven optimal.
+
+An action is "unplaceable before due" when no maintenance-window slot in the
+horizon completes it by `due_at`; this is surfaced as `window_conflict` rather
+than hidden inside a sorted list.

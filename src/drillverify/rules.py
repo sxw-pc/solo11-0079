@@ -17,6 +17,7 @@ RULE_TITLES = {
     "CFG-002": "Duplicate dataset declaration",
     "CFG-003": "Recovery plan has no usable datasets",
     "CFG-004": "Unsafe artifact manifest path",
+    "CFG-005": "Remediation scheduling declaration is invalid",
     "IN-000": "Required input file is missing",
     "IN-001": "Required catalog column missing",
     "IN-002": "Required value missing",
@@ -89,6 +90,12 @@ REMEDIATION = {
 }
 
 SLA_DAYS = {"critical": 1, "high": 3, "error": 3, "medium": 7, "warning": 14, "low": 14}
+HIGH_RISK_RANK = SEVERITY_RANK["high"]
+
+
+def is_high_risk(priority: str) -> bool:
+    """Critical and high are the schedule's high-risk classes."""
+    return SEVERITY_RANK.get(priority, 99) <= HIGH_RISK_RANK
 
 
 def category_for(rule_id: str) -> str:

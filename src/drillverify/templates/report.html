@@ -90,6 +90,70 @@
     </table>
   </div>
 
+  <h2>Remediation schedule</h2>
+  <div class="panel">
+    <p>
+      Selected objective <code>{{ report.remediation_plan.schedule.selected_objective or 'none' }}</code>.
+      Horizon <code>{{ report.remediation_plan.schedule.as_of }}</code> →
+      <code>{{ report.remediation_plan.schedule.horizon_end }}</code>
+      ({{ report.remediation_plan.schedule.horizon_days }} days,
+      {{ report.remediation_plan.schedule.slot_minutes }}-minute slots).
+      {% if not report.remediation_plan.schedule.planable %}
+      <strong>Scheduling stopped explicitly:</strong>
+      <code>{{ report.remediation_plan.schedule.planable_reason }}</code>.
+      {% endif %}
+    </p>
+    {% for batch in report.remediation_plan.schedule.batches %}
+    <p class="small">
+      Batch <code>{{ batch.team }}</code>: {{ batch.action_count }} actions,
+      limit {{ batch.limit }}{% if batch.over_limit %}, <strong>over limit</strong>{% endif %}.
+    </p>
+    {% endfor %}
+    {% for outcome in report.remediation_plan.schedule.objectives %}
+    <div class="panel">
+      <h3>Objective <code>{{ outcome.objective }}</code></h3>
+      <p class="small">
+        Scheduled {{ outcome.scheduled_count }}, unscheduled {{ outcome.unscheduled_count }},
+        overdue high-risk {{ outcome.overdue_high_count }},
+        overdue total {{ outcome.overdue_total_count }},
+        maintenance impact {{ outcome.total_impact_minutes }} min,
+        proven optimal {{ outcome.optimal }}.
+      </p>
+      <table>
+        <thead><tr><th>Start</th><th>End</th><th>Owner</th><th>Dataset</th><th>Action</th><th>Priority</th><th>Delay</th></tr></thead>
+        <tbody>
+        {% for item in outcome.scheduled %}
+          <tr>
+            <td>{{ item.start_at }}</td><td>{{ item.end_at }}</td>
+            <td>{{ item.owner_team }}</td><td>{{ item.dataset_id }}</td>
+            <td><code>{{ item.action_id }}</code>{% if item.overdue %} <span class="sev sev-high">overdue</span>{% endif %}</td>
+            <td><span class="sev sev-{{ item.priority }}">{{ item.priority }}</span></td>
+            <td>{{ item.delay_reason or '-' }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7">No action is schedulable under this objective.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if outcome.unscheduled %}
+      <table>
+        <thead><tr><th>Unscheduled action</th><th>Dataset</th><th>Reason</th><th>Detail</th></tr></thead>
+        <tbody>
+        {% for item in outcome.unscheduled %}
+          <tr>
+            <td><code>{{ item.action_id }}</code></td>
+            <td>{{ item.dataset_id or 'unassigned' }}</td>
+            <td><code>{{ item.reason }}</code></td>
+            <td>{{ item.detail }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
   <h2>Input integrity manifest</h2>
   <div class="panel">
     <table>

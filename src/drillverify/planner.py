@@ -43,7 +43,12 @@ def build_plan(
     backups: tuple[BackupRecord, ...],
     events: tuple[DrillEvent, ...],
 ) -> tuple[tuple[PlanAction, ...], dict[str, Any]]:
-    """Group actionable findings into owner-assigned, due-dated actions."""
+    """Group actionable findings into owner-assigned, due-dated actions.
+
+    The stable ``action_id`` is derived from the grouping seed, so every action
+    remains bound to the exact finding source that produced it. Scheduling later
+    references these IDs and never merges actions across datasets.
+    """
     owners = {dataset.dataset_id: dataset.owner_team for dataset in plan.datasets}
     backup_owner = {item.backup_id: item.dataset_id for item in backups}
     drill_owner = {item.drill_id: item.dataset_id for item in events}
@@ -88,10 +93,12 @@ def build_plan(
     actions.sort(key=PlanAction.sort_key)
     priority_counts = Counter(action.priority for action in actions)
     category_counts = Counter(action.category for action in actions)
+    dataset_counts = Counter(action.dataset_id for action in actions if action.dataset_id)
     summary = {
         "action_count": len(actions),
         "by_priority": {key: priority_counts[key] for key in sorted(priority_counts)},
         "by_category": {key: category_counts[key] for key in sorted(category_counts)},
+        "by_dataset": {key: dataset_counts[key] for key in sorted(dataset_counts)},
         "next_due_at": min((action.due_at for action in actions), default=None),
     }
     return tuple(actions), summary

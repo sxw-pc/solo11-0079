@@ -96,12 +96,124 @@ class DatasetConfig:
         }
 
 
+SELECTOR_FIELDS = (
+    "action_id",
+    "category",
+    "rule_id",
+    "object_type",
+    "object_id",
+)
+
+
+@dataclass(frozen=True)
+class TeamCapacity:
+    """Per-slot parallel capacity declared for one owner team."""
+
+    team: str
+    parallel_capacity: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"team": self.team, "parallel_capacity": self.parallel_capacity}
+
+
+@dataclass(frozen=True)
+class ActionProfile:
+    """Estimated execution and maintenance-impact duration per action category."""
+
+    category: str
+    duration_minutes: int
+    impact_minutes: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "category": self.category,
+            "duration_minutes": self.duration_minutes,
+            "impact_minutes": self.impact_minutes,
+        }
+
+
+@dataclass(frozen=True)
+class ActionSelector:
+    """Conjunctive selector matching PlanAction fields by exact value."""
+
+    fields: tuple[tuple[str, str], ...]
+
+    def matches(self, action: Any) -> bool:
+        return all(getattr(action, key, None) == value for key, value in self.fields)
+
+    def to_dict(self) -> dict[str, str]:
+        return {key: value for key, value in self.fields}
+
+
+@dataclass(frozen=True)
+class DependencyRule:
+    """A prerequisite action must finish before the dependent action starts."""
+
+    dataset_id: str
+    prerequisite: ActionSelector
+    dependent: ActionSelector
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "dataset_id": self.dataset_id,
+            "prerequisite": self.prerequisite.to_dict(),
+            "dependent": self.dependent.to_dict(),
+        }
+
+
+@dataclass(frozen=True)
+class SchedulingConfig:
+    """Plan-authorized scheduling policy for remediation actions."""
+
+    slot_minutes: int
+    horizon_days: int
+    action_limit: int
+    objectives: tuple[str, ...]
+    default_objective: str
+    team_capacities: tuple[TeamCapacity, ...]
+    action_profiles: tuple[ActionProfile, ...]
+    dependencies: tuple[DependencyRule, ...]
+
+    def capacity_for(self, team: str) -> int | None:
+        for item in self.team_capacities:
+            if item.team == team:
+                return item.parallel_capacity
+        return None
+
+    def profile_for(self, category: str) -> ActionProfile | None:
+        for item in self.action_profiles:
+            if item.category == category:
+                return item
+        return None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "slot_minutes": self.slot_minutes,
+            "horizon_days": self.horizon_days,
+            "action_limit": self.action_limit,
+            "objectives": list(self.objectives),
+            "default_objective": self.default_objective,
+            "team_capacities": {
+                item.team: item.parallel_capacity for item in self.team_capacities
+            },
+            "action_profiles": {
+                item.category: {
+                    "duration_minutes": item.duration_minutes,
+                    "impact_minutes": item.impact_minutes,
+                }
+                for item in self.action_profiles
+            },
+            "dependencies": [item.to_dict() for item in self.dependencies],
+        }
+
+
 @dataclass(frozen=True)
 class RecoveryPlan:
     as_of: datetime
     analysis_window_days: int
     datasets: tuple[DatasetConfig, ...]
     plan_path: str
+    scheduling: SchedulingConfig | None = None
 
     @property
     def window_start(self) -> datetime:
@@ -119,4 +231,5 @@ class RecoveryPlan:
             "window_start": format_utc(self.window_start),
             "datasets": [dataset.to_dict() for dataset in self.datasets],
             "plan_path": self.plan_path,
+            "scheduling": self.scheduling.to_dict() if self.scheduling else None,
         }

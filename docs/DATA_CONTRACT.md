@@ -30,8 +30,65 @@ Required dataset keys:
 | `maintenance_window` | non-empty string | Declared window label |
 | `artifact_manifest_path` | safe relative directory | Holds `manifest-<backup_id>.json` |
 
+`maintenance_window` uses `ddd:HH:MM-HH:MMZ` with a lowercase three-letter weekday
+(`mon`…`sun`), 24-hour UTC times and a same-day end after the start. Windows are
+repeated weekly and clipped to the scheduling horizon.
+
 The manifest path is a directory under the fixture root. It is validated before
 any I/O. Each backup resolves to `manifest-<backup_id>.json` inside it.
+
+## Remediation scheduling — `scheduling` block
+
+The optional top-level `scheduling` block turns remediation actions into an
+executable slot-level schedule. When present it is strictly validated; any issue
+is `CFG-005` and prevents a run.
+
+| Key | Type / rule | Meaning |
+|---|---|---|
+| `slot_minutes` | must equal `30` | Fixed discrete slot size |
+| `horizon_days` | integer 1–28 | Scheduling horizon from `as_of` |
+| `action_limit` | integer 1–12 (default 12) | Max actions in one independent owner-team batch |
+| `objectives` | non-empty unique list of `min_overdue_high`, `min_impact` | Authorized optimization goals |
+| `default_objective` | one of `objectives` | Objective reported as selected |
+| `team_capacities` | mapping team → 1–16 | Parallel actions per slot for each owner team |
+| `action_profiles` | mapping category → `{duration_minutes, impact_minutes}` | Must cover every remediation category |
+| `dependencies` | list of dependency rules | Explicit prerequisite ordering |
+
+Each dependency rule is `{dataset_id, prerequisite: selector, dependent: selector}`.
+A selector is a non-empty conjunction of exact values over `action_id`,
+`category`, `rule_id`, `object_type`, `object_id`. Selectors resolve only against
+actions of the declared dataset; `action_id` values are the stable IDs from the
+remediation plan. A selector that matches no action, a prerequisite that is itself
+unschedulable, or a dependency cycle marks the dependent action unschedulable with
+an explicit reason instead of being silently dropped.
+
+Hard scheduling constraints: an action may start only in a discrete slot whose
+entire duration fits inside its own dataset maintenance window and inside the
+horizon; a team's concurrent actions per slot never exceed its declared capacity;
+and a dependent action starts only after every prerequisite has finished.
+
+Two objectives are optimized with identical hard constraints:
+
+- `min_overdue_high` — fewest overdue high-risk actions, then fewest unscheduled
+  actions, then least maintenance impact.
+- `min_impact` — most scheduled actions, then least maintenance impact, then
+  fewest overdue high-risk actions.
+
+Unscheduled actions count as overdue, so no objective is improved by dropping
+work. Search is exact. Any action left out is reported with one of
+`unknown_dataset`, `invalid_maintenance_window`, `no_team_capacity`,
+`no_duration_profile`, `no_window_slot_in_horizon`, `action_limit_exceeded`,
+`dependency_missing`, `dependency_cycle`, `dependency_unschedulable`,
+`dependency_conflict`, `capacity_conflict`, `window_conflict` or
+`search_incomplete`. The result reports overdue counts, total maintenance-impact
+minutes and every unscheduled action for both objectives.
+
+Independent owner-team batches are the exact-solve units: capacity is declared
+per team and every dependency is dataset-scoped, so no slot constraint crosses a
+team. A batch above `action_limit` is returned unplanable, with every action in
+that batch explained; no action is ever silently truncated. The schedule reports
+`batches` with each team's action count and over-limit flag, plus an overall
+`status` of `empty`, `unplanable`, `partial` or `feasible`.
 
 ## Backup catalog — `fixtures/catalog/backup_catalog.csv`
 
@@ -104,7 +161,10 @@ and be readable. A `.json` evidence file must be an object containing a string
 `outputs/report.json` includes: schema/tool version, run ID, `generated_at`
 (equal to configured `as_of`), status, summary, plan, input manifest, dataset
 summaries, backups, chain results, restorable points, RPO/RTO results, drills,
-artifact/evidence checks, findings, attribution and remediation plan.
+artifact/evidence checks, findings, attribution and remediation plan. The
+remediation plan carries the action list plus a `schedule` object with both
+objectives, the selected objective, every scheduled slot and every unscheduled
+action with its reason.
 
 Each finding contains `rule_id`, `severity`, `object_type`, `object_id`,
 `message`, `file`, `line`, `input_sha256` and structured evidence. Input files

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from . import REPORT_VERSION, __version__
-from .actions import AttributionRecord, PlanAction
+from .actions import AttributionRecord, PlanAction, SchedulePlan
 from .attribution import attribute
 from .backup_chain import ChainAssessment, assess_chains
 from .config import load_plan
@@ -19,6 +19,7 @@ from .models import FileFingerprint, Finding, RecoveryPlan
 from .objectives import ObjectiveAssessment, evaluate_rpo, evaluate_rto
 from .paths import sha256_bytes, stable_json
 from .planner import build_plan
+from .scheduler import build_schedule
 from .records import ArtifactCheck, BackupRecord, DrillEvent, EvidenceCheck
 from .results import (
     BackupChainResult,
@@ -55,6 +56,7 @@ class RunBundle:
     attribution_summary: dict[str, Any]
     actions: tuple[PlanAction, ...]
     plan_summary: dict[str, Any]
+    schedule: SchedulePlan
     inputs: tuple[FileFingerprint, ...]
     backups: tuple[BackupRecord, ...]
     events: tuple[DrillEvent, ...]
@@ -213,6 +215,7 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
     findings = _dedupe_findings(all_findings, catalog_hash, drill_hash)
     records, attribution_summary = attribute(findings)
     actions, plan_summary = build_plan(plan, findings, catalog.records, drills.events)
+    schedule = build_schedule(plan, actions)
 
     fingerprints: dict[str, FileFingerprint] = {}
     for fingerprint in (
@@ -259,6 +262,14 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         "rpo_breaches": sum(1 for item in rpo if item.status in {"breach", "no_points"}),
         "rto_breaches": sum(1 for item in rto if item.status == "breach"),
         "action_count": len(actions),
+        "schedule_planable": schedule.planable,
+        "schedule_status": schedule.status,
+        "scheduled_action_count": (
+            len(schedule.selected.scheduled) if schedule.selected else 0
+        ),
+        "unscheduled_action_count": (
+            len(schedule.selected.unscheduled) if schedule.selected else len(actions)
+        ),
         "input_file_count": len(inputs),
         "validation_rejected_rows": catalog.rejected_count + drills.rejected_count,
     }
@@ -277,6 +288,7 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         attribution_summary=attribution_summary,
         actions=actions,
         plan_summary=plan_summary,
+        schedule=schedule,
         inputs=inputs,
         backups=catalog.records,
         events=drills.events,

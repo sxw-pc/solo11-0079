@@ -51,6 +51,7 @@ def build_report(bundle: RunBundle) -> dict[str, Any]:
         "remediation_plan": {
             "summary": bundle.plan_summary,
             "actions": [item.to_dict() for item in bundle.actions],
+            "schedule": bundle.schedule.to_dict(),
         },
     }
 
@@ -105,6 +106,50 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {action['priority']} | {_cell(action['owner_team'])} | {_cell(', '.join(action['rule_ids']))} | "
             f"{_cell(action['object_id'])} | {action['due_at']} | {_cell(action['title'])} |"
         )
+    schedule = report["remediation_plan"].get("schedule")
+    if schedule:
+        lines.extend(
+            [
+                "",
+                "## Remediation Schedule",
+                "",
+                f"- Selected objective: `{schedule['selected_objective'] or 'none'}`",
+                f"- Planable: `{schedule['planable']}` (reason: `{schedule['planable_reason'] or 'none'}`)",
+                f"- Horizon: `{schedule['as_of']}` → `{schedule['horizon_end']}` "
+                f"({schedule['horizon_days']} days × {schedule['slot_minutes']} min slots)",
+            ]
+        )
+        for outcome in schedule["objectives"]:
+            lines.extend(
+                [
+                    "",
+                    f"### Objective `{outcome['objective']}`",
+                    "",
+                    f"- Scheduled: `{outcome['scheduled_count']}`; unscheduled: "
+                    f"`{outcome['unscheduled_count']}`",
+                    f"- Overdue high-risk actions: `{outcome['overdue_high_count']}`; "
+                    f"overdue total: `{outcome['overdue_total_count']}`",
+                    f"- Total maintenance impact: `{outcome['total_impact_minutes']}` minutes",
+                    f"- Proven optimal: `{outcome['optimal']}` "
+                    f"(exhaustive nodes `{outcome['exhaustive_nodes']}`)",
+                    "",
+                    "| Start | End | Owner | Dataset | Action | Priority | Impact | Overdue | Delay |",
+                    "|---|---|---|---|---|---|---:|---|---|",
+                ]
+            )
+            for item in outcome["scheduled"]:
+                lines.append(
+                    f"| {item['start_at']} | {item['end_at']} | {_cell(item['owner_team'])} | "
+                    f"{_cell(item['dataset_id'])} | `{item['action_id']}` | {item['priority']} | "
+                    f"{item['impact_minutes']} | {item['overdue']} | {item['delay_reason'] or '-'} |"
+                )
+            if outcome["unscheduled"]:
+                lines.extend(["", "Unscheduled actions:", ""])
+                for item in outcome["unscheduled"]:
+                    lines.append(
+                        f"- `{item['action_id']}` ({item['priority']}, {_cell(item['dataset_id'] or 'unassigned')}) "
+                        f"— `{item['reason']}`: {_cell(item['detail'])}"
+                    )
     lines.extend(
         [
             "",
@@ -163,6 +208,7 @@ def write_reports(bundle: RunBundle, out_dir: Path) -> dict[str, Path]:
             "as_of": format_utc(bundle.plan.as_of),
             "summary": bundle.plan_summary,
             "actions": [item.to_dict() for item in bundle.actions],
+            "schedule": bundle.schedule.to_dict(),
         },
     )
     _dump_json(

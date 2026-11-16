@@ -26,6 +26,12 @@ cleanup or remote operation.
 | `consistency.py` | Required step coverage, retries, row/hash reconciliation |
 | `attribution.py` | Stable failure categories and probes |
 | `planner.py` | Deterministic owner-assigned remediation actions |
+| `schedule_config.py` | Strict `scheduling` block validation |
+| `schedule_windows.py` | Maintenance-window parsing and discrete slot enumeration |
+| `schedule_deps.py` | Dependency selector resolution, missing-match and cycle detection |
+| `schedule_solver.py` | Exact per-team branch-and-bound solver |
+| `schedule_outcome.py` | Slot-level scheduled/unscheduled result assembly |
+| `scheduler.py` | Scheduling orchestration across objectives |
 | `reporting.py` | JSON, Markdown and self-contained HTML output |
 | `ledger.py` | Append-only SQLite audit rows and query-only reads |
 | `web.py` | Local read-only Flask review console |
@@ -42,7 +48,7 @@ plan -> loaders -> validators -> artifacts/evidence
      -> chains/restorable points
      -> drill checks + RPO/RTO
      -> findings + attribution
-     -> remediation plan
+     -> remediation plan -> maintenance-window schedule
      -> report writers + ledger
 ```
 
@@ -65,8 +71,29 @@ Artifact readiness includes catalog file presence, byte size, file SHA-256 match
 manifest presence, manifest parse success, and catalog/manifest agreement on
 backup ID, row count and schema version.
 
-## Objective semantics
+## Remediation scheduling semantics
 
+The plan's `scheduling` block declares slot size, horizon, per-team per-slot
+capacity, per-category duration and impact, and explicit dependencies. Scheduling
+is exact, not a severity-ordered list:
+
+- independent owner-team batches are solved exactly; capacity is per team and
+  dependencies are dataset-scoped, so batches never share a slot constraint;
+  capping each batch keeps the exact search tractable without decimating work;
+- every action may start only where its whole duration fits its dataset's
+  maintenance window and the horizon;
+- each team never exceeds its per-slot parallel capacity;
+- dependents start only after all prerequisites finish; missing matches,
+  unschedulable prerequisites and cycles are explicit reasons;
+- `min_overdue_high` and `min_impact` use the same hard constraints and report
+  overdue high-risk counts, total impact minutes and every unscheduled action;
+- a batch above the action limit returns unplanable, never a silent truncation.
+
+A dependency declared as "artifact fix before dependent replay" is expressed as
+two selectors, both resolved by the stable action IDs emitted by the planner, so
+equal-looking objects in other datasets cannot be merged.
+
+## Objective semantics
 RPO:
 
 - consider restorable points with `window_start <= finished_at <= as_of`;

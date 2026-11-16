@@ -30,6 +30,7 @@ def test_read_only_views_render(app):
     assert findings.status_code == 200 and b"OBJ-POINT-001" in findings.data
     plan = client.get("/runs/1/plan")
     assert plan.status_code == 200 and b"Remediation and re-drill plan" in plan.data
+    assert b"Unscheduled actions" in plan.data or b"Scheduled" in plan.data
     assert client.get("/healthz").get_json() == {"status": "ok", "read_only": True}
 
 

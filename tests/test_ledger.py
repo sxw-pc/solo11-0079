@@ -60,6 +60,22 @@ def test_ledger_tables_persist_input_hashes(bundle, tmp_path: Path):
     assert category == "chain_integrity"
 
 
+def test_ledger_records_schedule_rows(bundle, tmp_path: Path):
+    from drillverify.ledger_schedule import get_schedule
+
+    db = tmp_path / "ledger.sqlite3"
+    run_pk = _record(db, bundle)
+    for objective in bundle.schedule.objectives:
+        rows = get_schedule(db, run_pk, objective)
+        outcome = bundle.schedule.outcome_for(objective)
+        assert len(rows["scheduled"]) == len(outcome.scheduled)
+        assert len(rows["unscheduled"]) == len(outcome.unscheduled)
+        scheduled_ids = {item["action_id"] for item in rows["scheduled"]}
+        unscheduled_ids = {item["action_id"] for item in rows["unscheduled"]}
+        assert scheduled_ids == {item.action_id for item in outcome.scheduled}
+        assert unscheduled_ids == {item.action_id for item in outcome.unscheduled}
+
+
 def test_missing_ledger_is_explicit(tmp_path: Path):
     try:
         list_runs(tmp_path / "absent.sqlite3")

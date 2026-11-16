@@ -4,7 +4,8 @@
 <p class="muted"><a href="{{ url_for('run_detail', run_pk=run.id) }}">Run {{ run.run_id }}</a> / plan</p>
 <h1>Remediation and re-drill plan</h1>
 <p class="lede">
-  Due dates are computed from configured <code>as_of</code> plus severity SLA days. No action
+  Due dates are computed from configured <code>as_of</code> plus severity SLA days. The
+  schedule below is a discrete-slot feasibility result, not a list order. No action
   executes against a backup or restore system from this console.
 </p>
 
@@ -15,6 +16,60 @@
     <div class="card"><div class="label">{{ priority }}</div><div class="value">{{ count }}</div></div>
   {% endfor %}
 </div>
+
+<h2>Schedule — objective <code>{{ schedule_summary.selected_objective or 'none' }}</code></h2>
+<p>
+  Horizon <code>{{ schedule_summary.as_of }}</code> → <code>{{ schedule_summary.horizon_end }}</code>.
+  {% if schedule_summary.planable %}This objective's schedule is proven optimal under the
+  declared hard constraints.{% else %}Scheduling stopped explicitly: <code>{{ schedule_summary.planable_reason }}</code>.{% endif %}
+</p>
+{% if schedule_summary.summary %}
+<div class="cards">
+  <div class="card"><div class="label">Scheduled</div><div class="value">{{ schedule_summary.summary.scheduled_count }}</div></div>
+  <div class="card"><div class="label">Unscheduled</div><div class="value">{{ schedule_summary.summary.unscheduled_count }}</div></div>
+  <div class="card"><div class="label">Overdue high</div><div class="value">{{ schedule_summary.summary.overdue_high_count }}</div></div>
+  <div class="card"><div class="label">Impact minutes</div><div class="value">{{ schedule_summary.summary.total_impact_minutes }}</div></div>
+</div>
+{% endif %}
+
+{% for item in schedule.scheduled %}
+<div class="panel">
+  <h3><span class="sev sev-{{ item.priority }}">{{ item.priority }}</span> · {{ item.start_at }} → {{ item.end_at }} · <code>{{ item.action_id }}</code></h3>
+  <dl class="detail-grid">
+    <dt>Owner</dt><dd>{{ item.owner_team }}</dd>
+    <dt>Dataset</dt><dd>{{ item.dataset_id }}</dd>
+    <dt>Maintenance window</dt><dd><code>{{ item.maintenance_window }}</code></dd>
+    <dt>Slots</dt><dd>{{ item.start_slot }}–{{ item.end_slot }}</dd>
+    <dt>Due</dt><dd>{{ item.due_at }} {% if item.overdue %}<strong>(overdue by {{ item.overdue_minutes }} min)</strong>{% endif %}</dd>
+    <dt>Impact</dt><dd>{{ item.impact_minutes }} min</dd>
+    <dt>Delay reason</dt><dd>{{ item.delay_reason or 'on time, no delay' }}</dd>
+    {% if item.dependency_ids %}<dt>Depends on</dt><dd><code>{{ item.dependency_ids|join(', ') }}</code></dd>{% endif %}
+  </dl>
+</div>
+{% endfor %}
+
+{% if schedule.unscheduled %}
+<h2>Unscheduled actions</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Action</th><th>Owner</th><th>Dataset</th><th>Priority</th><th>Reason</th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for item in schedule.unscheduled %}
+      <tr>
+        <td><code>{{ item.action_id }}</code></td>
+        <td>{{ item.owner_team }}</td>
+        <td>{{ item.dataset_id or 'unassigned' }}</td>
+        <td><span class="sev sev-{{ item.priority }}">{{ item.priority }}</span></td>
+        <td><code>{{ item.reason }}</code></td>
+        <td>{{ item.detail }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2>Action definitions</h2>
 
 {% for action in actions %}
 <div class="panel">

@@ -11,6 +11,7 @@ import yaml
 
 from .models import DatasetConfig, FileFingerprint, Finding, RecoveryPlan
 from .paths import UnsafePath, resolve_under, safe_relative, sha256_file
+from .schedule_config import parse_scheduling
 from .timeutil import TimestampError, parse_utc
 
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]{2,63}$")
@@ -215,10 +216,22 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
         issue("CFG-003", "No valid dataset declaration remains.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
 
+    scheduling = None
+    if "scheduling" in raw:
+        def schedule_issue(object_id: str, message: str) -> None:
+            issue("CFG-005", message, object_id)
+
+        scheduling = parse_scheduling(
+            raw.get("scheduling"), {item.owner_team for item in datasets}, schedule_issue
+        )
+        if scheduling is None:
+            return PlanLoad(None, tuple(findings), fingerprint)
+
     plan = RecoveryPlan(
         as_of=as_of,
         analysis_window_days=window,
         datasets=tuple(sorted(datasets, key=lambda item: item.dataset_id)),
         plan_path=rel_path,
+        scheduling=scheduling,
     )
     return PlanLoad(plan, tuple(sorted(findings, key=Finding.sort_key)), fingerprint)

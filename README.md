@@ -51,7 +51,9 @@ There are no write, execute, rerun, delete or downstream-dispatch endpoints.
 5. Evaluate RPO gaps and drill wall-clock RTO.
 6. Check required steps, evidence, row counts and checksums.
 7. Attribute failures to stable categories and generate owner-assigned actions.
-8. Write reports, a self-contained HTML artifact and an append-only SQLite ledger.
+8. Bind actions to discrete maintenance-window slots and report overdue,
+   impact and unschedulable reasons for both authorized objectives.
+9. Write reports, a self-contained HTML artifact and an append-only SQLite ledger.
 
 ## Determinism and traceability
 

@@ -248,7 +248,7 @@
       "status": "fail"
     }
   ],
-  "run_id": "ea64dfaf846ec4d7",
+  "run_id": "0848c198172a9e83",
   "status": "fail",
   "summary": {
     "action_count": 27,
@@ -269,7 +269,11 @@
     "restorable_point_count": 54,
     "rpo_breaches": 2,
     "rto_breaches": 1,
+    "schedule_planable": true,
+    "schedule_status": "partial",
+    "scheduled_action_count": 14,
     "successful_drill_count": 2,
+    "unscheduled_action_count": 13,
     "validation_rejected_rows": 9
   }
 }

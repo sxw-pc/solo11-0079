@@ -16,6 +16,25 @@ def test_all_report_formats_are_written(bundle, tmp_path: Path):
     assert document["summary"]["overall_status"] == "fail"
     assert document["input_manifest"]
     assert document["remediation_plan"]["actions"]
+    schedule = document["remediation_plan"]["schedule"]
+    assert schedule["slot_minutes"] == 30
+    assert schedule["objectives"]
+    plan_file = json.loads(outputs["plan"].read_text(encoding="utf-8"))
+    assert plan_file["schedule"] == schedule
+
+
+def test_markdown_reports_overdue_and_unscheduled(bundle):
+    from drillverify.reporting import build_report
+
+    text = render_markdown(build_report(bundle))
+    assert "## Remediation Schedule" in text
+    assert "Overdue high-risk actions" in text
+    assert "Unscheduled actions:" in text
+    schedule = build_report(bundle)["remediation_plan"]["schedule"]
+    for outcome in schedule["objectives"]:
+        assert f"Objective `{outcome['objective']}`" in text
+        for item in outcome["unscheduled"]:
+            assert item["action_id"] in text
 
 
 def test_html_is_self_contained(report):

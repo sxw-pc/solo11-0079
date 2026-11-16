@@ -46,3 +46,33 @@ datasets:
     owner_team: team-gamma
     maintenance_window: "wed:01:00-02:00Z"
     artifact_manifest_path: "artifacts"
+scheduling:
+  slot_minutes: 30
+  horizon_days: 28
+  objectives:
+    - min_overdue_high
+    - min_impact
+  default_objective: min_overdue_high
+  team_capacities:
+    team-alpha: 2
+    team-beta: 2
+    team-gamma: 1
+    unassigned: 1
+  action_profiles:
+    configuration: {duration_minutes: 30, impact_minutes: 0}
+    input_quality: {duration_minutes: 30, impact_minutes: 0}
+    chain_integrity: {duration_minutes: 90, impact_minutes: 60}
+    artifact_integrity: {duration_minutes: 60, impact_minutes: 45}
+    evidence_integrity: {duration_minutes: 60, impact_minutes: 30}
+    data_consistency: {duration_minutes: 60, impact_minutes: 45}
+    recoverability: {duration_minutes: 120, impact_minutes: 90}
+    rpo_gap: {duration_minutes: 60, impact_minutes: 30}
+    rto_gap: {duration_minutes: 90, impact_minutes: 60}
+    general: {duration_minutes: 30, impact_minutes: 0}
+  dependencies:
+    - dataset_id: ds-ledger
+      prerequisite: {category: artifact_integrity, object_type: backup, object_id: bk-ledger-002}
+      dependent: {category: evidence_integrity, object_type: drill, object_id: drill-ledger-0908}
+    - dataset_id: ds-orders
+      prerequisite: {category: data_consistency, object_type: drill, object_id: drill-orders-1106}
+      dependent: {category: rto_gap, object_type: drill, object_id: drill-orders-1106}
