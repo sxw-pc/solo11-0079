@@ -21,6 +21,8 @@ def _build_parser() -> argparse.ArgumentParser:
     for name in ("run", "demo", "validate"):
         command = sub.add_parser(name)
         command.add_argument("--fixtures", type=Path, default=Path("fixtures"))
+        command.add_argument("--book", type=Path, default=None,
+                             help="optional synthetic approval book for closure review")
         if name != "validate":
             command.add_argument("--out", type=Path, default=Path("outputs"))
             command.add_argument("--strict", action="store_true")
@@ -45,6 +47,10 @@ def _print_summary(bundle, outputs: dict[str, Path] | None, db_path: Path | None
         "status": bundle.status,
         "summary": bundle.summary,
         "remediation_actions": len(bundle.actions),
+        "closure_review": {
+            "availability": bundle.closures["availability"],
+            "summary": bundle.closures["summary"],
+        },
         "outputs": {key: str(value) for key, value in sorted(outputs.items())} if outputs else {},
         "ledger": str(db_path) if db_path else None,
     }
@@ -53,7 +59,7 @@ def _print_summary(bundle, outputs: dict[str, Path] | None, db_path: Path | None
 
 def _run(args: argparse.Namespace) -> int:
     try:
-        bundle = run_pipeline(args.fixtures)
+        bundle = run_pipeline(args.fixtures, args.book)
     except PipelineError as exc:
         _print_fatal(exc.findings)
         return 2

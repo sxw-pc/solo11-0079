@@ -52,6 +52,7 @@ def build_report(bundle: RunBundle) -> dict[str, Any]:
             "summary": bundle.plan_summary,
             "actions": [item.to_dict() for item in bundle.actions],
         },
+        "closure_review": bundle.closures,
     }
 
 
@@ -64,6 +65,37 @@ def _dump_json(path: Path, value: object) -> None:
 
 def _cell(value: object) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def _render_closure_markdown(review: dict[str, Any]) -> list[str]:
+    lines = ["", "## Closure Review", ""]
+    summary = review["summary"]
+    lines.append(
+        f"- Approval book: `{review['availability']}`; closed: {summary['closed']}; "
+        f"pending re-approval: {summary['pending_reapproval']}; reopened: {summary['reopened']}; "
+        f"unproven: {summary['unproven']}; open: {summary['open']}."
+    )
+    lines.append(
+        "- This section records whether the remediation *process* may be closed. "
+        "It does not assert that technical recovery succeeded and does not change "
+        "backup chains, RPO/RTO results or action due dates."
+    )
+    if review["availability"] == "no_approval_book":
+        lines.append("- No approval book was supplied; every action keeps its original plan view.")
+        return lines
+    lines.extend(["", "| Action | Status | Evidence version | Declarers / approvers | Witness |", "|---|---|---|---|---|"])
+    for decision in review["decisions"]:
+        evidence = decision["evidence"] or {}
+        approvers = ", ".join(
+            f"{item['display_name']} ({item['role_label']}, {item['authorization']})"
+            for item in decision["approvers"]
+        ) or "none"
+        witness = "; ".join(f"{item['code']} @ {item['source'] or 'n/a'}" for item in decision["witness"]) or "none"
+        lines.append(
+            f"| `{decision['action_id']}` | {decision['status']} | {evidence.get('version', 'n/a')} | "
+            f"{_cell(approvers)} | {_cell(witness)} |"
+        )
+    return lines
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -105,6 +137,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {action['priority']} | {_cell(action['owner_team'])} | {_cell(', '.join(action['rule_ids']))} | "
             f"{_cell(action['object_id'])} | {action['due_at']} | {_cell(action['title'])} |"
         )
+    lines.extend(_render_closure_markdown(report["closure_review"]))
     lines.extend(
         [
             "",

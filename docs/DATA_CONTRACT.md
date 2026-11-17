@@ -106,6 +106,32 @@ and be readable. A `.json` evidence file must be an object containing a string
 summaries, backups, chain results, restorable points, RPO/RTO results, drills,
 artifact/evidence checks, findings, attribution and remediation plan.
 
+## Approval book — optional `--book` input
+
+The approval book is synthetic JSON. It is never required; without it the run
+reports `no_approval_book` and every plan action stays `open`.
+
+| Key | Meaning |
+|---|---|
+| `decided_at` | Closure decision instant (ISO 8601); events after it are ignored |
+| `event_budget` | Positive integer; more approval/withdrawal events than this is `unproven` |
+| `people` | `person_id`, `display_name`, `team`, `identity_id`, `source` |
+| `role_holders` | Direct holders of `compliance` and `independent_verifier` |
+| `delegations` | `grant_id`, `role`, `from_person_id`, `to_person_id`, `granted_at`, `expires_at`, `source` |
+| `delegation_events` | `grant_id`, `at`, `reason`, `source` for revocations |
+| `actions` | One entry per action ID: revision, owner person, completion, approvals, events |
+
+Each action entry carries `action_revision` (must match the run's computed
+revision), `owner_person_id`, `completion` (`declared_by`, `evidence_path`,
+`evidence_sha256`, `evidence_version`, `declared_at`), `approvals` (`approval_id`,
+`role`, `person_id`, `via_grant_id`, `evidence_version`, `at`) and `events`
+(`approval_withdrawn` or `evidence_replaced`).
+
+The closure verdict is `closed`, `pending_reapproval`, `reopened`, `unproven` or
+`open`, and always includes the historical and current contract outcomes, the
+actual approver identities and authorization paths, the action revision, the
+effective evidence version and the witness for any break.
+
 Each finding contains `rule_id`, `severity`, `object_type`, `object_id`,
 `message`, `file`, `line`, `input_sha256` and structured evidence. Input files
 that are missing are traced to the catalog or drill-log SHA-256 that cited them;

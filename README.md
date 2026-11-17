@@ -3,7 +3,8 @@
 DrillVerify is a fully offline, configuration-driven bench for reviewing local
 backup/restore-drill evidence. It does not run backups or restores. It rebuilds
 backup chains, selects defensible restorable points, checks RPO/RTO evidence,
-attributes failures, and produces a deterministic re-drill plan and audit ledger.
+attributes failures, and produces a deterministic re-drill plan, an optional
+closure review over synthetic approvals, and an audit ledger.
 
 All bundled data is synthetic. Paths, teams, datasets and evidence are placeholders.
 
@@ -35,6 +36,10 @@ PYTHONPATH=src python -m drillverify validate --fixtures fixtures
 PYTHONPATH=src python -m drillverify serve --db outputs/ledger.sqlite3 --host 127.0.0.1 --port 5000
 ```
 
+Add `--book path/to/approval-book.json` to attach an optional synthetic approval
+book for closure review. Without it, every action keeps its original plan entry
+and no closure is claimed.
+
 `demo` and `run` exit `0` when a run was produced, even when the run status is
 `fail` (a failed drill is a valid finding). Add `--strict` to exit `1` when the
 report status is `fail`. Unusable configuration exits `2`.
@@ -51,7 +56,8 @@ There are no write, execute, rerun, delete or downstream-dispatch endpoints.
 5. Evaluate RPO gaps and drill wall-clock RTO.
 6. Check required steps, evidence, row counts and checksums.
 7. Attribute failures to stable categories and generate owner-assigned actions.
-8. Write reports, a self-contained HTML artifact and an append-only SQLite ledger.
+8. Optionally review an approval book: closure, re-approval or reopening per action.
+9. Write reports, a self-contained HTML artifact and an append-only SQLite ledger.
 
 ## Determinism and traceability
 

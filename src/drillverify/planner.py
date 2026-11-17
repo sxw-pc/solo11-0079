@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from .actions import PlanAction
+from .actions import PlanAction, action_revision, canonical_probes
 from .models import Finding, RecoveryPlan
 from .paths import sha256_bytes, stable_json
 from .records import BackupRecord, DrillEvent
@@ -62,6 +62,11 @@ def build_plan(
         severity = lead.severity
         rule_ids = tuple(sorted({member.rule_id for member in members}))
         probes = {tuple(sorted(member.probe().items())): member.probe() for member in members}
+        canonical = canonical_probes(tuple(probes.values()))
+        canonical_probes_tuple = tuple(canonical)
+        source_inputs = tuple(
+            sorted({probe["input_sha256"] for probe in canonical if probe["input_sha256"]})
+        )
         rationale = " | ".join(sorted({member.message for member in members}))
         due = format_date(add_days(plan.as_of, SLA_DAYS.get(severity, 14)))
         action_seed = stable_json(
@@ -82,7 +87,9 @@ def build_plan(
                 rationale=rationale,
                 instruction=remediation_for(lead.rule_id),
                 due_at=due,
-                probes=tuple(probes.values()),
+                probes=canonical_probes_tuple,
+                revision=action_revision(severity, rule_ids, canonical_probes_tuple, source_inputs),
+                source_inputs=source_inputs,
             )
         )
     actions.sort(key=PlanAction.sort_key)

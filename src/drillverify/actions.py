@@ -3,9 +3,58 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
+from .paths import sha256_bytes, stable_json
 from .rules import SEVERITY_RANK
+
+
+def canonical_probes(probes: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Stable ordering of evidence probes for digesting and display."""
+    return sorted(
+        probes,
+        key=lambda item: (
+            str(item.get("file", "")),
+            int(item.get("line", 0) or 0),
+            str(item.get("rule_id", "")),
+            str(item.get("input_sha256", "")),
+        ),
+    )
+
+
+def action_revision(
+    priority: str,
+    rule_ids: tuple[str, ...] | list[str],
+    probes: Iterable[dict[str, Any]],
+    source_inputs: Iterable[str],
+) -> str:
+    """Digest of everything an approver attests to for one action.
+
+    Approval is bound to this digest: a later run that changes the priority,
+    rule set, probe locations or probe input hashes produces a new revision, so
+    an old approval can never be inherited by the changed action.
+    """
+    seed = stable_json(
+        {
+            "priority": priority,
+            "rule_ids": sorted(rule_ids),
+            "probes": canonical_probes(probes),
+            "source_inputs": sorted(source_inputs),
+        }
+    )
+    return sha256_bytes(seed.encode("utf-8"))[:16]
+
+
+def revision_for(action: "PlanAction") -> str:
+    """Use the stored revision, or recompute one for older action payloads."""
+    if getattr(action, "revision", ""):
+        return str(action.revision)
+    return action_revision(
+        action.priority,
+        tuple(action.rule_ids),
+        tuple(action.probes),
+        tuple(getattr(action, "source_inputs", ())),
+    )
 
 
 @dataclass(frozen=True)
@@ -48,6 +97,8 @@ class PlanAction:
     instruction: str
     due_at: str
     probes: tuple[dict[str, Any], ...]
+    revision: str = ""
+    source_inputs: tuple[str, ...] = ()
 
     def sort_key(self) -> tuple[Any, ...]:
         return (
@@ -72,6 +123,8 @@ class PlanAction:
             "rationale": self.rationale,
             "instruction": self.instruction,
             "due_at": self.due_at,
+            "revision": self.revision,
+            "source_inputs": list(self.source_inputs),
             "probes": sorted(
                 self.probes,
                 key=lambda item: (item.get("file", ""), item.get("line", 0)),

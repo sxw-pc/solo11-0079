@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 from . import REPORT_VERSION, __version__
 from .actions import AttributionRecord, PlanAction
+from .approvals import no_book_review, review_book_file
 from .attribution import attribute
 from .backup_chain import ChainAssessment, assess_chains
 from .config import load_plan
@@ -61,6 +62,7 @@ class RunBundle:
     status: str
     summary: dict[str, Any]
     dataset_summaries: tuple[dict[str, Any], ...]
+    closures: dict[str, Any] = field(default_factory=dict)
 
     @property
     def counts(self) -> dict[str, int]:
@@ -154,8 +156,12 @@ def _dataset_summaries(
     return tuple(rows)
 
 
-def run_pipeline(fixtures_root: Path) -> RunBundle:
-    """Run all stages without writing reports or touching a database."""
+def run_pipeline(fixtures_root: Path, approval_book: Path | None = None) -> RunBundle:
+    """Run all stages without writing reports or touching a database.
+
+    ``approval_book`` is optional; without it every action is reported as open
+    and the original remediation plan is left untouched.
+    """
     root = fixtures_root.resolve()
     plan_load = load_plan(root / "plans" / "recovery_plan.yaml", root)
     if plan_load.plan is None:
@@ -213,6 +219,10 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
     findings = _dedupe_findings(all_findings, catalog_hash, drill_hash)
     records, attribution_summary = attribute(findings)
     actions, plan_summary = build_plan(plan, findings, catalog.records, drills.events)
+    if approval_book is None:
+        closures = no_book_review(actions)
+    else:
+        closures = review_book_file(actions, approval_book, root)
 
     fingerprints: dict[str, FileFingerprint] = {}
     for fingerprint in (
@@ -232,6 +242,9 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         "datasets": [item.dataset_id for item in plan.datasets],
         "inputs": [item.to_dict() for item in inputs],
     }
+    book_sha = (closures.get("book") or {}).get("sha256")
+    if book_sha:
+        run_seed["approval_book"] = book_sha
     run_id = sha256_bytes(stable_json(run_seed).encode("utf-8"))[:16]
     status = _overall_status(findings)
     severity_counts = Counter(item.severity for item in findings)
@@ -283,4 +296,5 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         status=status,
         summary=summary,
         dataset_summaries=dataset_summaries,
+        closures=closures,
     )

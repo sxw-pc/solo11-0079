@@ -16,11 +16,51 @@
   {% endfor %}
 </div>
 
+<h2>Closure review</h2>
+{% if review.availability == 'no_approval_book' %}
+<div class="empty">
+  No approval book was supplied for this run. Every action below keeps its original plan entry;
+  no action is claimed closed. A closure conclusion needs recorded completion evidence, two
+  independent approvers and a valid authorization path.
+</div>
+{% elif review.availability == 'not_recorded' %}
+<div class="empty">
+  This ledger predates closure review. Actions keep their original plan entries and no closure
+  is claimed.
+</div>
+{% else %}
+<div class="panel">
+  <p class="small muted">
+    A closure decision records whether the remediation <em>process</em> may be closed. It does not
+    assert that technical recovery succeeded and does not alter backup chains, RPO/RTO results or
+    action due dates.
+  </p>
+  <table>
+    <thead><tr><th>Closed</th><th>Pending re-approval</th><th>Reopened</th><th>Unproven</th><th>Open</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="numeric">{{ review.summary.closed }}</td>
+        <td class="numeric">{{ review.summary.pending_reapproval }}</td>
+        <td class="numeric">{{ review.summary.reopened }}</td>
+        <td class="numeric">{{ review.summary.unproven }}</td>
+        <td class="numeric">{{ review.summary.open }}</td>
+      </tr>
+    </tbody>
+  </table>
+  {% if review.issues %}
+  <p class="small">Approval book issues:
+    {% for item in review.issues %}<code>{{ item.code }}</code> {{ item.detail }}{% if item.source %} ({{ item.source }}){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
 {% for action in actions %}
+{% set closure = closures.get(action.action_id) %}
 <div class="panel">
   <h3><span class="sev sev-{{ action.priority }}">{{ action.priority }}</span> · {{ action.title }}</h3>
   <dl class="detail-grid">
-    <dt>Action ID</dt><dd><code>{{ action.action_id }}</code></dd>
+    <dt>Action ID</dt><dd><code>{{ action.action_id }}</code> · revision <code>{{ action.revision }}</code></dd>
     <dt>Owner</dt><dd>{{ action.owner_team }}</dd>
     <dt>Dataset</dt><dd>{{ action.dataset_id or 'unassigned' }}</dd>
     <dt>Object</dt><dd><code>{{ action.object_type }}:{{ action.object_id }}</code></dd>
@@ -33,6 +73,45 @@
       {% for probe in action.probes %}
         <div>{{ probe.file }}{% if probe.line %}:{{ probe.line }}{% endif %} · <code>{{ probe.input_sha256[:20] }}…</code></div>
       {% endfor %}
+    </dd>
+    <dt>Closure</dt>
+    <dd>
+      {% if closure %}
+        <span class="status status-{{ 'pass' if closure.status == 'closed' else 'warn' }}">{{ closure.status }}</span>
+        <div class="small">{{ closure.reason }}</div>
+        {% if closure.evidence %}
+          <div class="small">Evidence <code>{{ closure.evidence.path }}</code> version <code>{{ closure.evidence.version }}</code>
+            ({{ 'verified' if closure.evidence.verified else 'unverified' }}), digest <code>{{ closure.evidence.sha256[:16] }}…</code></div>
+        {% endif %}
+        {% if closure.declared_by %}
+          <div class="small">Declared complete by {{ closure.declared_by.display_name or closure.declared_by.person_id }}
+            (identity <code>{{ closure.declared_by.identity_id or 'unknown' }}</code>)</div>
+        {% endif %}
+        {% for approver in closure.approvers %}
+          <div class="small">
+            {{ approver.role_label }}: {{ approver.display_name }} (identity <code>{{ approver.identity_id }}</code>)
+            · {{ approver.authorization }} path {{ approver.authorization_path|join(' → ') }}
+            · signed {{ approver.signed_at }} on {{ approver.evidence_version }}
+          </div>
+        {% else %}
+          <div class="small muted">No valid approver satisfies both contracts.</div>
+        {% endfor %}
+        {% if closure.withdrawals %}
+          <div class="small">Withdrawals:
+            {% for item in closure.withdrawals %}<code>{{ item.approval_id }}</code> {{ item.reason or 'no reason recorded' }}{% if not loop.last %}; {% endif %}{% endfor %}
+          </div>
+        {% endif %}
+        {% if closure.witness %}
+          <ul class="small">
+            {% for item in closure.witness %}
+              <li><code>{{ item.code }}</code> {{ item.detail }}{% if item.source %} — source <code>{{ item.source }}</code>{% endif %}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% else %}
+        <span class="status">open</span>
+        <div class="small muted">No approval record; original plan entry unchanged.</div>
+      {% endif %}
     </dd>
   </dl>
 </div>

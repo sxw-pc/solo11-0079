@@ -7,10 +7,11 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from .closure_ledger import CLOSURE_SCHEMA, record_closures
 from .pipeline import RunBundle
 from .rules import category_for
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,7 +81,7 @@ CREATE TABLE IF NOT EXISTS actions (
   due_at TEXT NOT NULL,
   payload_json TEXT NOT NULL
 );
-"""
+""" + CLOSURE_SCHEMA
 
 
 def _write_connection(path: Path) -> sqlite3.Connection:
@@ -182,6 +183,7 @@ def record_run(db_path: Path, bundle: RunBundle, report: dict[str, Any]) -> int:
                     for item in bundle.actions
                 ],
             )
+            record_closures(connection, run_pk, bundle.closures)
         return run_pk
     finally:
         connection.close()

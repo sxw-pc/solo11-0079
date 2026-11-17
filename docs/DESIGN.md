@@ -25,7 +25,11 @@ cleanup or remote operation.
 | `objectives.py` | RPO gap and wall-clock RTO evaluation |
 | `consistency.py` | Required step coverage, retries, row/hash reconciliation |
 | `attribution.py` | Stable failure categories and probes |
-| `planner.py` | Deterministic owner-assigned remediation actions |
+| `planner.py` | Deterministic owner-assigned remediation actions plus action revisions |
+| `approvals.py` / `approvals_load.py` | Synthetic approval-book records and strict loading |
+| `approvals_auth.py` | Delegation-path resolution and evidence binding |
+| `approvals_review.py` / `approvals_verdict.py` | Two-contract closure verdicts |
+| `closure_ledger.py` | Closure-review persistence for the read-only console |
 | `reporting.py` | JSON, Markdown and self-contained HTML output |
 | `ledger.py` | Append-only SQLite audit rows and query-only reads |
 | `web.py` | Local read-only Flask review console |
@@ -96,6 +100,39 @@ Input problems are `error`/`warning`; analytical problems are `critical`, `high`
 `medium` or `info`. A run fails when any finding is `critical`, `high` or `error`;
 it warns for `medium`/`warning`; otherwise it passes. A failed drill is a valid
 run result, not a pipeline crash. Only an unusable recovery plan prevents a run.
+
+## Closure review semantics
+
+A remediation action is an operational plan entry, not a claim that a fix
+succeeded. The closure review therefore answers a narrower question: may the
+*process* around the action be recorded as closed?
+
+Every action carries a content-derived `revision` over its priority, rule IDs,
+probes and source input hashes. An approval in the optional approval book is
+bound to that revision and to one completion-evidence version. A later run that
+changes a source finding, probe location or probe hash produces a different
+revision; the old approval is not inherited and is never reused for another
+action.
+
+Two authorization contracts are evaluated together:
+
+- `historical`: the two approvers were authorized when they signed, even if a
+  delegation was revoked later.
+- `current`: each delegation chain must also still be valid at the closure
+  decision instant.
+
+Delegation chains must be time-bounded, acyclic, within the role boundary and
+founded on a direct role holder. The action owner and the completion declarer
+must be different actual people from both approvers; aliases sharing an
+`identity_id` do not create independence. A count of `approved` events is never
+sufficient. Withdrawals and evidence replacements reopen a previously closed
+process and name the broken authorization or evidence input as a witness.
+Missing identity, an invalid book or an exceeded event budget yields `unproven`
+rather than a guess.
+
+The review never changes backup chains, restorable points, RPO/RTO results or
+action due dates. Without an approval book every action keeps its original plan
+view and no closure is claimed.
 
 ## Web and ledger design
 

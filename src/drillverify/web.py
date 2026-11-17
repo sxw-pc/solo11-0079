@@ -7,6 +7,7 @@ from typing import Any
 
 from flask import Flask, abort, render_template, request
 
+from .closure_ledger import get_closure_review
 from .ledger import get_actions, get_findings, get_run, list_runs
 
 ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
@@ -122,11 +123,15 @@ def create_app(db_path: Path) -> Flask:
     def plan(run_pk: int) -> str:
         run = _run_or_404(db_path, run_pk)
         actions = get_actions(db_path, run_pk)
+        review = get_closure_review(db_path, run_pk)
+        by_action = {item["action_id"]: item for item in review.get("decisions", [])}
         return render_template(
             "plan.html",
             run=run,
             report=run["report"],
             actions=actions,
+            review=review,
+            closures=by_action,
         )
 
     @app.errorhandler(404)

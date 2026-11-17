@@ -90,6 +90,36 @@
     </table>
   </div>
 
+  <h2>Closure review</h2>
+  <div class="panel">
+    <p class="small muted">
+      A closure decision records whether the remediation <em>process</em> may be closed.
+      It does not assert that technical recovery succeeded and does not change backup
+      chains, RPO/RTO results or action due dates.
+    </p>
+    {% if report.closure_review.availability == 'no_approval_book' %}
+      <p>No approval book was supplied; every action keeps its original plan view and no
+      closure is claimed.</p>
+    {% else %}
+      <table>
+        <thead><tr><th>Action</th><th>Status</th><th>Evidence version</th><th>Approvers</th><th>Witness</th></tr></thead>
+        <tbody>
+        {% for item in report.closure_review.decisions %}
+          <tr>
+            <td><code>{{ item.action_id }}</code></td>
+            <td>{{ item.status }}<br><span class="muted small">{{ item.reason }}</span></td>
+            <td>{{ item.evidence.version if item.evidence else 'n/a' }}</td>
+            <td class="small">
+              {% for approver in item.approvers %}{{ approver.display_name }} ({{ approver.role_label }}, {{ approver.authorization }}){% if not loop.last %}; {% endif %}{% else %}none{% endfor %}
+            </td>
+            <td class="small">{% for witness in item.witness %}<code>{{ witness.code }}</code>{% if not loop.last %}; {% endif %}{% else %}none{% endfor %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+
   <h2>Input integrity manifest</h2>
   <div class="panel">
     <table>
