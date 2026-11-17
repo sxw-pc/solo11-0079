@@ -48,6 +48,7 @@ def build_report(bundle: RunBundle) -> dict[str, Any]:
             "summary": bundle.attribution_summary,
             "records": [item.to_dict() for item in bundle.attribution],
         },
+        "chargeback": bundle.chargeback.to_dict(),
         "remediation_plan": {
             "summary": bundle.plan_summary,
             "actions": [item.to_dict() for item in bundle.actions],
@@ -116,6 +117,33 @@ def render_markdown(report: dict[str, Any]) -> str:
     )
     for item in report["input_manifest"]:
         lines.append(f"| {_cell(item['path'])} | `{item['sha256']}` | {item['size_bytes']} |")
+    chargeback = report["chargeback"]
+    if chargeback["status"] != "not_configured":
+        lines.extend(["", "## Storage Chargeback", ""])
+        lines.append(f"- Status: **{chargeback['status']}**")
+        lines.append(f"- Logical bytes (catalog sum; shared blocks are double-counted here): `{chargeback['logical_bytes']}`")
+        physical = chargeback["physical"]
+        if physical is not None:
+            lines.append(f"- Total invoice: `{physical['total_invoice']}` {chargeback['currency']}")
+            lines.extend(["", "| Period | Tier | Blocks | Union bytes | Invoice |", "|---|---|---:|---:|---:|"])
+            for bucket in physical["buckets"]:
+                lines.append(
+                    f"| {bucket['period']} | {bucket['tier']} | {len(bucket['block_ids'])} | "
+                    f"{bucket['union_bytes']} | {bucket['invoice']} |"
+                )
+            for contract in chargeback["contracts"]:
+                lines.extend(["", f"### Contract `{contract['contract']}`", ""])
+                if contract["status"] != "settled":
+                    lines.append(f"_Unavailable: {contract['reason']}_")
+                    continue
+                lines.append(f"Budget balanced: `{contract['budget_balanced']}`; total `{contract['total']}`.")
+                lines.extend(["", "| Team | Amount |", "|---|---:|"])
+                for charge in contract["teams"]:
+                    lines.append(f"| {_cell(charge['team'])} | {charge['amount']} |")
+        if chargeback["findings"]:
+            lines.extend(["", "| Rule | Object | Message |", "|---|---|---|"])
+            for item in chargeback["findings"]:
+                lines.append(f"| {item['rule_id']} | {_cell(item['object_id'])} | {_cell(item['message'])} |")
     lines.extend(
         [
             "",

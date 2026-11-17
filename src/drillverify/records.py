@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from .models import FileFingerprint, Finding
 from .timeutil import format_utc
 
 
@@ -107,6 +108,44 @@ class ArtifactCheck:
             "manifest": self.manifest.to_dict() if self.manifest else None,
             "failure_rules": list(self.failure_rules),
         }
+
+
+@dataclass(frozen=True)
+class BlockRef:
+    """One ordered reference covering ``length_bytes`` of an artifact at ``offset_bytes``."""
+
+    block_id: str
+    offset_bytes: int
+    length_bytes: int
+
+
+@dataclass(frozen=True)
+class StorageBlock:
+    """A declared physical block in the shared object store."""
+
+    block_id: str
+    sha256: str
+    size_bytes: int
+    tier: str
+    object_path: str
+    primary_team: str
+
+
+@dataclass(frozen=True)
+class StorageInventory:
+    """Verified physical blocks plus per-backup ordered byte coverage."""
+
+    blocks: tuple[StorageBlock, ...]
+    refs: dict[str, tuple[BlockRef, ...]]
+
+
+@dataclass(frozen=True)
+class StorageAssessment:
+    """Inventory verification outcome; ``inventory`` is None while unproven."""
+
+    inventory: StorageInventory | None
+    findings: tuple[Finding, ...]
+    files: tuple[FileFingerprint, ...]
 
 
 @dataclass(frozen=True)

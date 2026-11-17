@@ -90,6 +90,51 @@
     </table>
   </div>
 
+  {% if report.chargeback.status != "not_configured" %}
+  <h2>Storage chargeback</h2>
+  <div class="panel">
+    <p>Status: <span class="status status-{{ 'pass' if report.chargeback.status == 'settled' else 'fail' }}">{{ report.chargeback.status }}</span>
+      · Logical bytes (catalog sum; shared blocks double-counted): {{ report.chargeback.logical_bytes }}
+      {% if report.chargeback.physical %} · Total invoice: <strong>{{ report.chargeback.physical.total_invoice }} {{ report.chargeback.currency }}</strong>{% endif %}
+    </p>
+    {% if report.chargeback.physical %}
+    <table>
+      <thead><tr><th>Period</th><th>Tier</th><th class="numeric">Blocks</th><th class="numeric">Union bytes</th><th class="numeric">Invoice</th></tr></thead>
+      <tbody>
+      {% for bucket in report.chargeback.physical.buckets %}
+        <tr><td>{{ bucket.period }}</td><td>{{ bucket.tier }}</td><td class="numeric">{{ bucket.block_ids|length }}</td><td class="numeric">{{ bucket.union_bytes }}</td><td class="numeric">{{ bucket.invoice }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% for contract in report.chargeback.contracts %}
+      <h3>Contract <code>{{ contract.contract }}</code></h3>
+      {% if contract.status == "settled" %}
+      <table>
+        <thead><tr><th>Team</th><th class="numeric">Amount</th></tr></thead>
+        <tbody>
+        {% for charge in contract.teams %}
+          <tr><td>{{ charge.team }}</td><td class="numeric">{{ charge.amount }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">Unavailable: {{ contract.reason }}</p>
+      {% endif %}
+    {% endfor %}
+    {% endif %}
+    {% if report.chargeback.findings %}
+    <table>
+      <thead><tr><th>Rule</th><th>Object</th><th>Message</th></tr></thead>
+      <tbody>
+      {% for item in report.chargeback.findings %}
+        <tr><td><code>{{ item.rule_id }}</code></td><td><code>{{ item.object_id }}</code></td><td>{{ item.message }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <h2>Input integrity manifest</h2>
   <div class="panel">
     <table>

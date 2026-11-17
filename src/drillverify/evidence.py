@@ -15,6 +15,9 @@ class ArtifactAssessment:
     manifests: dict[str, ArtifactManifest]
     findings: tuple[Finding, ...]
     files: tuple[FileFingerprint, ...]
+    def ready_ids(self) -> set[str]:
+        """Backup ids whose artifact passed every integrity check."""
+        return {item.backup_id for item in self.checks if item.artifact_ready}
 @dataclass(frozen=True)
 class EvidenceAssessment:
     checks: tuple[EvidenceCheck, ...]

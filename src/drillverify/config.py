@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from .models import DatasetConfig, FileFingerprint, Finding, RecoveryPlan
-from .paths import UnsafePath, resolve_under, safe_relative, sha256_file
+from .models import ChargebackConfig, DatasetConfig, FileFingerprint, Finding, PricingStep, RecoveryPlan, TierPricing
+from .paths import UnsafePath, normalize_relative, resolve_under, safe_relative, sha256_file
 from .timeutil import TimestampError, parse_utc
 
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]{2,63}$")
@@ -34,10 +35,84 @@ class PlanLoad:
     plan: RecoveryPlan | None
     findings: tuple[Finding, ...]
     fingerprint: FileFingerprint | None
+    chargeback: ChargebackConfig | None = None
 
 
 def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _decimal(value: object) -> Decimal | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        value = str(value)
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = Decimal(value.strip())
+    except InvalidOperation:
+        return None
+    return parsed if parsed.is_finite() else None
+
+
+def _pricing(raw: object, prefix: str, issue: Any) -> TierPricing | None:
+    def bad(message: str) -> None:
+        issue("BILL-007", f"{prefix}: {message}", "chargeback")
+
+    if not isinstance(raw, dict):
+        return bad("must be a mapping")
+    min_fee, steps_raw = _decimal(raw.get("min_fee", 0)), raw.get("steps")
+    if min_fee is None or min_fee < 0 or not isinstance(steps_raw, list) or not steps_raw:
+        return bad("min_fee must be non-negative and steps a non-empty list")
+    steps: list[PricingStep] = []
+    previous = Decimal(0)
+    for index, item in enumerate(steps_raw):
+        per_mb = _decimal(item.get("per_mb")) if isinstance(item, dict) else None
+        if per_mb is None or per_mb < 0:
+            return bad("per_mb must be a non-negative decimal")
+        up_to = _decimal(item.get("up_to_mb")) if item.get("up_to_mb") is not None else None
+        if item.get("up_to_mb") is not None and (up_to is None or up_to <= previous):
+            return bad("up_to_mb must be positive and strictly ascending")
+        if up_to is None and index != len(steps_raw) - 1:
+            return bad("only the final step may be unbounded")
+        previous = up_to if up_to is not None else previous
+        steps.append(PricingStep(up_to, per_mb))
+    if steps[-1].up_to_mb is not None:
+        return bad("the final step must be unbounded")
+    return TierPricing(tuple(steps), min_fee)
+
+
+def _parse_chargeback(raw: object, issue: Any, root: Path) -> ChargebackConfig | None:
+    def bad(message: str) -> None:
+        issue("BILL-007", f"chargeback: {message}", "chargeback")
+
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        return bad("must be a mapping")
+    try:
+        inventory_path = normalize_relative(raw.get("inventory_path"), field="chargeback.inventory_path")
+        resolve_under(root, inventory_path, field="chargeback.inventory_path")
+    except UnsafePath as exc:
+        return bad(str(exc))
+    currency = raw.get("currency", "units")
+    max_teams = raw.get("max_teams", 8)
+    max_subsets = raw.get("max_subsets", 256)
+    if not isinstance(currency, str) or not currency.strip():
+        return bad("currency must be a non-empty string")
+    if not _is_int(max_teams) or not 1 <= max_teams <= 12 or not _is_int(max_subsets) or not 2 <= max_subsets <= 65536:
+        return bad("max_teams (1..12) or max_subsets (2..65536) is out of range")
+    pricing_raw = raw.get("pricing")
+    if not isinstance(pricing_raw, dict) or "default" not in pricing_raw:
+        return bad("pricing must define a 'default' tier")
+    pricing: dict[str, TierPricing] = {}
+    for tier in sorted(pricing_raw):
+        if not isinstance(tier, str) or not tier.strip():
+            return bad("pricing tier names must be non-empty strings")
+        parsed = _pricing(pricing_raw[tier], f"chargeback.pricing.{tier}", issue)
+        if parsed is None:
+            return None
+        pricing[tier] = parsed
+    return ChargebackConfig(inventory_path, currency.strip(), max_teams, max_subsets, pricing)
 
 
 def _fingerprint(root: Path, path: Path) -> FileFingerprint | None:
@@ -215,10 +290,11 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
         issue("CFG-003", "No valid dataset declaration remains.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
 
+    chargeback = _parse_chargeback(raw.get("chargeback"), issue, root)
     plan = RecoveryPlan(
         as_of=as_of,
         analysis_window_days=window,
         datasets=tuple(sorted(datasets, key=lambda item: item.dataset_id)),
         plan_path=rel_path,
     )
-    return PlanLoad(plan, tuple(sorted(findings, key=Finding.sort_key)), fingerprint)
+    return PlanLoad(plan, tuple(sorted(findings, key=Finding.sort_key)), fingerprint, chargeback)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from .rules import SEVERITY_RANK
@@ -93,6 +94,51 @@ class DatasetConfig:
             "owner_team": self.owner_team,
             "maintenance_window": self.maintenance_window,
             "artifact_manifest_path": self.artifact_manifest_path,
+        }
+
+
+@dataclass(frozen=True)
+class PricingStep:
+    """One tiered-price step; ``up_to_mb`` is None for the unbounded final step."""
+
+    up_to_mb: Decimal | None
+    per_mb: Decimal
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "up_to_mb": str(self.up_to_mb) if self.up_to_mb is not None else None,
+            "per_mb": str(self.per_mb),
+        }
+
+
+@dataclass(frozen=True)
+class TierPricing:
+    """Exact decimal price ladder plus the minimum fee for one storage tier."""
+
+    steps: tuple[PricingStep, ...]
+    min_fee: Decimal
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"steps": [step.to_dict() for step in self.steps], "min_fee": str(self.min_fee)}
+
+
+@dataclass(frozen=True)
+class ChargebackConfig:
+    """Authorized storage-billing configuration from the recovery plan."""
+
+    inventory_path: str
+    currency: str
+    max_teams: int
+    max_subsets: int
+    pricing: dict[str, TierPricing]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "inventory_path": self.inventory_path,
+            "currency": self.currency,
+            "max_teams": self.max_teams,
+            "max_subsets": self.max_subsets,
+            "pricing": {tier: self.pricing[tier].to_dict() for tier in sorted(self.pricing)},
         }
 
 

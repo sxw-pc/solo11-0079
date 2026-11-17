@@ -11,6 +11,7 @@ from . import REPORT_VERSION, __version__
 from .actions import AttributionRecord, PlanAction
 from .attribution import attribute
 from .backup_chain import ChainAssessment, assess_chains
+from .chargeback import assess_storage, build_chargeback
 from .config import load_plan
 from .consistency import DrillAssessment, assess_drills
 from .evidence import ArtifactAssessment, EvidenceAssessment, assess_artifacts, assess_evidence
@@ -22,6 +23,7 @@ from .planner import build_plan
 from .records import ArtifactCheck, BackupRecord, DrillEvent, EvidenceCheck
 from .results import (
     BackupChainResult,
+    ChargebackReport,
     DrillSummary,
     RestorablePoint,
     RpoResult,
@@ -61,6 +63,7 @@ class RunBundle:
     status: str
     summary: dict[str, Any]
     dataset_summaries: tuple[dict[str, Any], ...]
+    chargeback: ChargebackReport
 
     @property
     def counts(self) -> dict[str, int]:
@@ -170,6 +173,8 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
     drill_hash = drill_load.fingerprint.sha256 if drill_load.fingerprint else ""
     artifact_assessment: ArtifactAssessment = assess_artifacts(catalog.records, plan, root)
     evidence_assessment: EvidenceAssessment = assess_evidence(drills.events, root)
+    ready_ids = artifact_assessment.ready_ids()
+    storage_assessment = assess_storage(catalog.records, ready_ids, plan_load.chargeback, root)
     chain_assessment: ChainAssessment = assess_chains(
         plan,
         catalog.records,
@@ -210,7 +215,12 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
     all_findings.extend(chain_assessment.findings)
     all_findings.extend(drill_assessment.findings)
     all_findings.extend(objective_assessment.findings)
+    billing_findings = tuple(item for item in all_findings if item.rule_id.startswith("BILL-"))
+    all_findings = [item for item in all_findings if not item.rule_id.startswith("BILL-")]
     findings = _dedupe_findings(all_findings, catalog_hash, drill_hash)
+    chargeback = build_chargeback(
+        plan, catalog.records, ready_ids, plan_load.chargeback, storage_assessment, billing_findings
+    )
     records, attribution_summary = attribute(findings)
     actions, plan_summary = build_plan(plan, findings, catalog.records, drills.events)
 
@@ -221,6 +231,7 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         + ([drill_load.fingerprint] if drill_load.fingerprint else [])
         + list(artifact_assessment.files)
         + list(evidence_assessment.files)
+        + list(storage_assessment.files)
     ):
         fingerprints[fingerprint.path] = fingerprint
     inputs = tuple(sorted(fingerprints.values(), key=lambda item: item.path))
@@ -283,4 +294,5 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         status=status,
         summary=summary,
         dataset_summaries=dataset_summaries,
+        chargeback=chargeback,
     )
