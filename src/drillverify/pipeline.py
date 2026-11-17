@@ -27,6 +27,7 @@ from .results import (
     RpoResult,
     RtoResult,
 )
+from .retention import RetentionAssessment, assess_retention
 from .timeutil import format_utc
 from .validators import validate_catalog, validate_drills
 
@@ -58,6 +59,7 @@ class RunBundle:
     inputs: tuple[FileFingerprint, ...]
     backups: tuple[BackupRecord, ...]
     events: tuple[DrillEvent, ...]
+    retention: RetentionAssessment
     status: str
     summary: dict[str, Any]
     dataset_summaries: tuple[dict[str, Any], ...]
@@ -202,6 +204,16 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
     )
     objective_assessment = ObjectiveAssessment(rpo, rto, rpo_findings + rto_findings)
 
+    retention = assess_retention(
+        plan,
+        catalog.records,
+        artifact_assessment.checks,
+        chain_assessment.points,
+        rpo,
+        catalog_path=catalog_load.path,
+        catalog_hash=catalog_hash,
+    )
+
     all_findings = list(plan_load.findings)
     all_findings.extend(catalog.findings)
     all_findings.extend(drills.findings)
@@ -280,6 +292,7 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         inputs=inputs,
         backups=catalog.records,
         events=drills.events,
+        retention=retention,
         status=status,
         summary=summary,
         dataset_summaries=dataset_summaries,

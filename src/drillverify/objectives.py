@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+from datetime import datetime
+from typing import Iterable, Mapping
 
-from .models import Finding, RecoveryPlan
+from .models import DatasetConfig, Finding, RecoveryPlan
 from .records import DrillEvent
 from .results import RestorablePoint, RpoResult, RtoResult
 from .timeutil import format_utc, minutes_between
@@ -18,6 +19,62 @@ class ObjectiveAssessment:
     findings: tuple[Finding, ...]
 
 
+def _in_window_points(
+    dataset_id: str,
+    window_start: datetime,
+    as_of: datetime,
+    points: Iterable[RestorablePoint],
+) -> list[RestorablePoint]:
+    return sorted(
+        (
+            point
+            for point in points
+            if point.dataset_id == dataset_id
+            and window_start <= point.finished_at <= as_of
+        ),
+        key=lambda item: (item.finished_at, item.backup_id),
+    )
+
+
+def summarize_rpo(
+    dataset: DatasetConfig,
+    window_start: datetime,
+    as_of: datetime,
+    points: Iterable[RestorablePoint],
+) -> RpoResult:
+    """Measure adjacent in-window gaps and freshness at as_of for one dataset.
+
+    Pure metric core of :func:`evaluate_rpo` (no findings), so simulations
+    such as retention planning can recompute RPO conclusions for a reduced
+    set of restorable points.
+    """
+    in_window = _in_window_points(dataset.dataset_id, window_start, as_of, points)
+    if not in_window:
+        return RpoResult(
+            dataset.dataset_id, "no_points", dataset.rpo_minutes, 0,
+            None, None, None, None, None,
+        )
+    gaps = [
+        (minutes_between(left.finished_at, right.finished_at), left, right)
+        for left, right in zip(in_window, in_window[1:])
+    ]
+    last = in_window[-1]
+    since_last = minutes_between(last.finished_at, as_of)
+    gaps.append((since_last, last, None))
+    max_gap, gap_from, gap_to = max(gaps, key=lambda item: (item[0], item[1].finished_at))
+    return RpoResult(
+        dataset.dataset_id,
+        "breach" if max_gap > dataset.rpo_minutes else "pass",
+        dataset.rpo_minutes,
+        len(in_window),
+        max_gap,
+        format_utc(gap_from.finished_at),
+        format_utc(gap_to.finished_at) if gap_to else format_utc(as_of),
+        format_utc(last.finished_at),
+        since_last,
+    )
+
+
 def evaluate_rpo(
     plan: RecoveryPlan,
     points: tuple[RestorablePoint, ...],
@@ -28,29 +85,9 @@ def evaluate_rpo(
     results: list[RpoResult] = []
     findings: list[Finding] = []
     for dataset in plan.datasets:
-        in_window = sorted(
-            (
-                point
-                for point in points
-                if point.dataset_id == dataset.dataset_id
-                and plan.window_start <= point.finished_at <= plan.as_of
-            ),
-            key=lambda item: (item.finished_at, item.backup_id),
-        )
-        if not in_window:
-            results.append(
-                RpoResult(
-                    dataset_id=dataset.dataset_id,
-                    status="no_points",
-                    rpo_minutes=dataset.rpo_minutes,
-                    point_count=0,
-                    max_gap_minutes=None,
-                    gap_from=None,
-                    gap_to=None,
-                    last_point_at=None,
-                    minutes_since_last_point=None,
-                )
-            )
+        result = summarize_rpo(dataset, plan.window_start, plan.as_of, points)
+        results.append(result)
+        if result.status == "no_points":
             findings.append(
                 Finding(
                     "OBJ-POINT-001",
@@ -68,28 +105,11 @@ def evaluate_rpo(
                 )
             )
             continue
-        gaps: list[tuple[int, RestorablePoint, RestorablePoint | None]] = []
-        for left, right in zip(in_window, in_window[1:]):
-            gaps.append((minutes_between(left.finished_at, right.finished_at), left, right))
-        last = in_window[-1]
-        since_last = minutes_between(last.finished_at, plan.as_of)
-        gaps.append((since_last, last, None))
-        max_gap, gap_from, gap_to = max(gaps, key=lambda item: (item[0], item[1].finished_at))
-        breach = max_gap > dataset.rpo_minutes
-        results.append(
-            RpoResult(
-                dataset_id=dataset.dataset_id,
-                status="breach" if breach else "pass",
-                rpo_minutes=dataset.rpo_minutes,
-                point_count=len(in_window),
-                max_gap_minutes=max_gap,
-                gap_from=format_utc(gap_from.finished_at),
-                gap_to=format_utc(gap_to.finished_at) if gap_to else format_utc(plan.as_of),
-                last_point_at=format_utc(last.finished_at),
-                minutes_since_last_point=since_last,
+        if result.status == "breach":
+            in_window = _in_window_points(
+                dataset.dataset_id, plan.window_start, plan.as_of, points
             )
-        )
-        if breach:
+            last = in_window[-1]
             findings.append(
                 Finding(
                     "OBJ-RPO-001",
@@ -101,9 +121,9 @@ def evaluate_rpo(
                     0,
                     {
                         "rpo_minutes": dataset.rpo_minutes,
-                        "max_gap_minutes": max_gap,
-                        "gap_from": format_utc(gap_from.finished_at),
-                        "gap_to": format_utc(gap_to.finished_at) if gap_to else format_utc(plan.as_of),
+                        "max_gap_minutes": result.max_gap_minutes,
+                        "gap_from": result.gap_from,
+                        "gap_to": result.gap_to,
                         "last_point_backup_id": last.backup_id,
                     },
                     catalog_hash,

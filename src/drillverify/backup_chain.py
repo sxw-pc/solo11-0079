@@ -40,6 +40,37 @@ def _cycle_nodes(parent_map: dict[str, str]) -> set[str]:
     return members
 
 
+def ancestor_map(records: tuple[BackupRecord, ...]) -> dict[str, tuple[str, ...]]:
+    """Map every backup to its ancestor chain (itself first, root last).
+
+    Parent links are followed within the same dataset only, mirroring chain
+    evaluation. Missing parents and cycles terminate the walk, so the result
+    is always finite and deterministic. Simulations use this to recompute
+    which restorable points are invalidated when a backup is removed.
+    """
+    by_dataset: dict[str, dict[str, BackupRecord]] = {}
+    for record in records:
+        by_dataset.setdefault(record.dataset_id, {})[record.backup_id] = record
+    result: dict[str, tuple[str, ...]] = {}
+    for dataset_id in sorted(by_dataset):
+        own = by_dataset[dataset_id]
+        for backup_id in sorted(own):
+            chain: list[str] = []
+            seen: set[str] = set()
+            current = own[backup_id]
+            while current.backup_id not in seen:
+                seen.add(current.backup_id)
+                chain.append(current.backup_id)
+                if current.backup_type != "incremental":
+                    break
+                parent = own.get(current.parent_backup_id or "")
+                if parent is None:
+                    break
+                current = parent
+            result[backup_id] = tuple(chain)
+    return result
+
+
 def _chain_finding(
     rule: str,
     severity: str,

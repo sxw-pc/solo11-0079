@@ -52,6 +52,7 @@ def build_report(bundle: RunBundle) -> dict[str, Any]:
             "summary": bundle.plan_summary,
             "actions": [item.to_dict() for item in bundle.actions],
         },
+        "retention": bundle.retention.to_dict(),
     }
 
 
@@ -105,6 +106,53 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {action['priority']} | {_cell(action['owner_team'])} | {_cell(', '.join(action['rule_ids']))} | "
             f"{_cell(action['object_id'])} | {action['due_at']} | {_cell(action['title'])} |"
         )
+    retention = report["retention"]
+    lines.extend(
+        [
+            "",
+            "## Retention Simulation (conditional)",
+            "",
+            f"- {retention['simulation_note']}",
+            f"- Status: `{retention['status']}`; candidates: "
+            f"{retention['candidate_count']}/{retention['max_candidates']}; "
+            f"capacity upper bound: {retention['capacity_upper_bound_bytes']} bytes",
+        ]
+    )
+    if retention["reason"]:
+        lines.append(f"- Reason: {retention['reason']}")
+    lines.extend(
+        [
+            "",
+            "| Objective | Feasible | Deletions | Reclaimable bytes | Tightest RPO margin (min) |",
+            "|---|---|---:|---:|---:|",
+        ]
+    )
+    for plan in retention["plans"]:
+        margin = plan["tightest_margin_minutes"]
+        lines.append(
+            f"| {plan['objective']} | {'yes' if plan['feasible'] else 'no'} | "
+            f"{plan['deletion_count']} | {plan['total_reclaimable_bytes']} | "
+            f"{margin if margin is not None else 'n/a'} |"
+        )
+    for plan in retention["plans"]:
+        if not plan["feasible"] or not plan["deletions"]:
+            continue
+        lines.extend(
+            [
+                "",
+                f"### Candidate deletions — {plan['objective']} (human review required)",
+                "",
+                "| Backup | Dataset | Path | SHA-256 | Bytes | Affected descendants |",
+                "|---|---|---|---:|---|",
+            ]
+        )
+        for deletion in plan["deletions"][:16]:
+            descendants = ", ".join(deletion["affected_descendants"]) or "—"
+            lines.append(
+                f"| {_cell(deletion['backup_id'])} | {_cell(deletion['dataset_id'])} | "
+                f"{_cell(deletion['artifact_path'])} | `{deletion['input_sha256'][:12]}…` | "
+                f"{deletion['artifact_size_bytes']} | {_cell(descendants)} |"
+            )
     lines.extend(
         [
             "",
