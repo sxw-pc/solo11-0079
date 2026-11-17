@@ -106,6 +106,34 @@ class RtoResult:
 
 
 @dataclass(frozen=True)
+class StepEvidence:
+    """One adopted or invalidated drill-step evidence record."""
+
+    drill_id: str
+    step: str
+    attempt: int
+    line: int
+    evidence_ref: str
+    decision: str
+    reason: str
+    recovery_generation: str | None
+    data_digest: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "drill_id": self.drill_id,
+            "step": self.step,
+            "attempt": self.attempt,
+            "line": self.line,
+            "evidence_ref": self.evidence_ref,
+            "decision": self.decision,
+            "reason": self.reason,
+            "recovery_generation": self.recovery_generation,
+            "data_digest": self.data_digest,
+        }
+
+
+@dataclass(frozen=True)
 class DrillSummary:
     drill_id: str
     dataset_id: str
@@ -117,6 +145,9 @@ class DrillSummary:
     failed_steps: tuple[str, ...]
     skipped_steps: tuple[str, ...]
     evidence_ok: bool
+    current_generation: str | None = None
+    final_data_digest: str | None = None
+    evidence_policy: str = "strict_replay"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -130,4 +161,7 @@ class DrillSummary:
             "failed_steps": list(self.failed_steps),
             "skipped_steps": list(self.skipped_steps),
             "evidence_ok": self.evidence_ok,
+            "current_generation": self.current_generation,
+            "final_data_digest": self.final_data_digest,
+            "evidence_policy": self.evidence_policy,
         }

@@ -26,6 +26,7 @@ from .results import (
     RestorablePoint,
     RpoResult,
     RtoResult,
+    StepEvidence,
 )
 from .timeutil import format_utc
 from .validators import validate_catalog, validate_drills
@@ -49,6 +50,7 @@ class RunBundle:
     chains: tuple[BackupChainResult, ...]
     points: tuple[RestorablePoint, ...]
     drills: tuple[DrillSummary, ...]
+    drill_evidence: tuple[StepEvidence, ...]
     rpo: tuple[RpoResult, ...]
     rto: tuple[RtoResult, ...]
     attribution: tuple[AttributionRecord, ...]
@@ -199,6 +201,7 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         drill_assessment.success,
         drill_load.path,
         drill_hash,
+        {item.drill_id: item.status for item in drill_assessment.summaries},
     )
     objective_assessment = ObjectiveAssessment(rpo, rto, rpo_findings + rto_findings)
 
@@ -271,6 +274,7 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         chains=chain_assessment.chains,
         points=chain_assessment.points,
         drills=drill_assessment.summaries,
+        drill_evidence=drill_assessment.step_evidence,
         rpo=rpo,
         rto=rto,
         attribution=records,

@@ -69,6 +69,27 @@
     </table>
   </div>
 
+  <h2>Drill evidence lineage</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Drill</th><th>Step</th><th class="numeric">Attempt</th><th>Generation</th><th>Decision</th><th>Reason</th></tr></thead>
+      <tbody>
+      {% for item in report.drill_evidence %}
+        <tr>
+          <td><code>{{ item.drill_id }}</code></td>
+          <td>{{ item.step }}</td>
+          <td class="numeric">{{ item.attempt }}</td>
+          <td><code>{{ item.recovery_generation or '—' }}</code></td>
+          <td><span class="status status-{{ 'pass' if item.decision in ('adopted', 'reused') else 'fail' }}">{{ item.decision }}</span></td>
+          <td class="small muted">{{ item.reason }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6">No generation-aware evidence recorded.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
   <h2>Remediation and re-drill plan</h2>
   <div class="panel">
     <table>

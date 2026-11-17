@@ -118,14 +118,21 @@ def evaluate_rto(
     drill_success: Mapping[str, bool],
     drill_path: str,
     drill_hash: str,
+    drill_status: Mapping[str, str] | None = None,
 ) -> tuple[tuple[RtoResult, ...], tuple[Finding, ...]]:
-    """Measure wall-clock drill duration including failed attempts."""
+    """Measure wall-clock drill duration including failed attempts.
+
+    Duration always spans the first attempt through the last finish, so failed
+    retries count toward RTO. Only a drill proven successful can pass; an
+    inconclusive drill with valid duration is reported as ``not_met``.
+    """
     datasets = plan.dataset_map()
     grouped: dict[str, list[DrillEvent]] = {}
     for event in events:
         grouped.setdefault(event.drill_id, []).append(event)
     results: list[RtoResult] = []
     findings: list[Finding] = []
+    drill_status = drill_status or {}
     for drill_id in sorted(grouped):
         drill_events = grouped[drill_id]
         started = min(event.started_at for event in drill_events)
@@ -135,12 +142,8 @@ def evaluate_rto(
         duration = minutes_between(started, finished)
         target = datasets[dataset_id].rto_minutes
         successful = bool(drill_success.get(drill_id, False))
-        if duration > target:
-            status = "breach"
-        elif successful:
-            status = "pass"
-        else:
-            status = "not_met"
+        conclusion = drill_status.get(drill_id, "failed" if not successful else "success")
+        status = "breach" if duration > target else ("pass" if successful else "not_met")
         results.append(
             RtoResult(
                 drill_id=drill_id,
@@ -170,6 +173,7 @@ def evaluate_rto(
                         "started_at": format_utc(started),
                         "finished_at": format_utc(finished),
                         "successful": successful,
+                        "drill_status": conclusion,
                     },
                     drill_hash,
                 )

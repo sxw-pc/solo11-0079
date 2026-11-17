@@ -41,6 +41,7 @@ def build_report(bundle: RunBundle) -> dict[str, Any]:
             "rto": [item.to_dict() for item in bundle.rto],
         },
         "drills": [item.to_dict() for item in bundle.drills],
+        "drill_evidence": [item.to_dict() for item in bundle.drill_evidence],
         "artifacts": [item.to_dict() for item in bundle.artifacts],
         "evidence": [item.to_dict() for item in bundle.evidence],
         "findings": [item.to_dict() for item in bundle.findings],
@@ -105,6 +106,17 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {action['priority']} | {_cell(action['owner_team'])} | {_cell(', '.join(action['rule_ids']))} | "
             f"{_cell(action['object_id'])} | {action['due_at']} | {_cell(action['title'])} |"
         )
+    lines.extend(["", "## Drill Evidence Lineage", "",
+                  "| Drill | Step | Attempt | Generation | Decision | Reason |",
+                  "|---|---|---:|---|---|---|"])
+    for item in report["drill_evidence"]:
+        lines.append(
+            f"| {_cell(item['drill_id'])} | {_cell(item['step'])} | {item['attempt']} | "
+            f"{_cell(item['recovery_generation'] or '-')} | {item['decision']} | "
+            f"{_cell(item['reason'])} |"
+        )
+    if not report["drill_evidence"]:
+        lines.append("|  |  |  |  |  | _no generation-aware evidence_ |")
     lines.extend(
         [
             "",

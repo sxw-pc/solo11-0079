@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from .drill_common import EVIDENCE_POLICIES
 from .models import DatasetConfig, FileFingerprint, Finding, RecoveryPlan
 from .paths import UnsafePath, resolve_under, safe_relative, sha256_file
 from .timeutil import TimestampError, parse_utc
@@ -180,6 +181,12 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
         if not isinstance(checksum, bool) or not isinstance(rowcount, bool):
             issue("CFG-001", "checksum_required and rowcount_required must be booleans.", dataset_id)
             continue
+        policy = item.get("recovery_evidence_policy", "strict_replay")
+        if policy not in EVIDENCE_POLICIES:
+            issue("CFG-001",
+                  "recovery_evidence_policy must be strict_replay or evidence_reuse.",
+                  dataset_id)
+            continue
         try:
             manifest_dir = resolve_under(
                 root,
@@ -208,6 +215,7 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
                 owner_team=owner.strip(),
                 maintenance_window=window_label.strip(),
                 artifact_manifest_path=str(item["artifact_manifest_path"]),
+                recovery_evidence_policy=policy,
             )
         )
 

@@ -8,6 +8,7 @@ from .loaders import CATALOG_COLUMNS, LoadedRows
 from .models import Finding, RecoveryPlan
 from .records import BackupRecord, DrillEvent
 from .paths import UnsafePath, normalize_relative, resolve_under
+from .generations import validate_generation_markers
 from .timeutil import TimestampError, parse_utc
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]{2,63}$")
 _STEP_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
@@ -131,35 +132,14 @@ def validate_catalog(
             issue("IN-002", backup_id, "schema_version is required.", line_no)
             continue
         if size == 0:
-            findings.append(
-                Finding(
-                    "IN-003",
-                    "warning",
-                    "backup",
-                    backup_id,
-                    "Artifact size is zero; verify the synthetic artifact is intentional.",
-                    loaded.path,
-                    line_no,
-                    {"artifact_size_bytes": 0},
-                    file_hash,
-                )
-            )
-        records.append(
-            BackupRecord(
-                dataset_id=dataset_id,
-                backup_id=backup_id,
-                parent_backup_id=parent,
-                backup_type=backup_type,
-                started_at=started,
-                finished_at=finished,
-                artifact_path=artifact_rel,
-                artifact_size_bytes=size,
-                sha256=digest.lower(),
-                row_count=rows,
-                schema_version=schema_version,
-                line_no=line_no,
-            )
-        )
+            findings.append(Finding(
+                "IN-003", "warning", "backup", backup_id,
+                "Artifact size is zero; verify the synthetic artifact is intentional.",
+                loaded.path, line_no, {"artifact_size_bytes": 0}, file_hash))
+        records.append(BackupRecord(
+            dataset_id, backup_id, parent, backup_type, started, finished, artifact_rel,
+            size, digest.lower(), rows, schema_version, line_no,
+        ))
     ordered = sorted(records, key=lambda item: (item.dataset_id, item.finished_at, item.backup_id))
     return CatalogValidation(
         tuple(ordered),
@@ -258,6 +238,17 @@ def validate_drills(
                 issue("IN-011", drill_id, "reported_sha256 must be null or 64 hex characters.", line_no)
                 continue
             reported = reported.lower()
+        generation = raw.get("recovery_generation")
+        if generation is not None:
+            generation = str(generation).strip()
+            if not _ID_RE.fullmatch(generation):
+                issue("IN-016", drill_id, "recovery_generation must be a lowercase identifier.", line_no)
+                continue
+        digest = raw.get("data_digest")
+        if digest is not None and not _SHA_RE.fullmatch(str(digest).strip()):
+            issue("IN-016", drill_id, "data_digest must be null or 64 hexadecimal characters.", line_no)
+            continue
+        digest = str(digest).strip().lower() if digest is not None else None
         detail = raw.get("detail")
         if not isinstance(detail, str):
             issue("IN-003", drill_id, "detail must be a string.", line_no)
@@ -268,27 +259,11 @@ def validate_drills(
         elif identity != (dataset_id, backup_id):
             issue("IN-014", drill_id, "Drill identity conflicts with earlier events.", line_no)
             continue
-        events.append(
-            DrillEvent(
-                drill_id=drill_id,
-                dataset_id=dataset_id,
-                backup_id=backup_id,
-                step=step,
-                status=status,
-                attempt=attempt,
-                started_at=started,
-                finished_at=finished,
-                evidence_ref=evidence_ref,
-                detail=detail,
-                rows_restored=rows_restored,
-                reported_sha256=reported,
-                line_no=line_no,
-            )
-        )
+        events.append(DrillEvent(
+            drill_id, dataset_id, backup_id, step, status, attempt, started, finished,
+            evidence_ref, detail, rows_restored, reported, line_no, generation, digest,
+        ))
+    findings.extend(validate_generation_markers(events, loaded.path, file_hash))
     ordered = sorted(events, key=lambda item: (item.drill_id, item.started_at, item.step, item.attempt))
-    return DrillValidation(
-        tuple(ordered),
-        tuple(sorted(findings, key=Finding.sort_key)),
-        len(loaded.rows),
-        len(loaded.rows) - len(events),
-    )
+    return DrillValidation(tuple(ordered), tuple(sorted(findings, key=Finding.sort_key)),
+                           len(loaded.rows), len(loaded.rows) - len(events))

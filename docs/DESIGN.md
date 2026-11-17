@@ -20,10 +20,13 @@ cleanup or remote operation.
 | `config.py` | Strict recovery-plan parsing and path confinement |
 | `loaders.py` | CSV/JSONL readers preserving physical line numbers |
 | `validators.py` | Row validation, cross-reference checks, explicit rejection |
+| `generations.py` | Recovery-generation lineage and marker cross-row validation |
+| `generation_gate.py` | Same-generation evidence gate, invalidation and reuse policy |
+| `drill_common.py` | Shared drill policy constants and finding helper |
 | `evidence.py` | Artifact, manifest and evidence-file integrity |
 | `backup_chain.py` | Full/incremental chain reconstruction and points |
 | `objectives.py` | RPO gap and wall-clock RTO evaluation |
-| `consistency.py` | Required step coverage, retries, row/hash reconciliation |
+| `consistency.py` | Required step coverage, retries, row/hash/digest reconciliation |
 | `attribution.py` | Stable failure categories and probes |
 | `planner.py` | Deterministic owner-assigned remediation actions |
 | `reporting.py` | JSON, Markdown and self-contained HTML output |
@@ -64,6 +67,18 @@ An incremental backup is structurally restorable only when:
 Artifact readiness includes catalog file presence, byte size, file SHA-256 match,
 manifest presence, manifest parse success, and catalog/manifest agreement on
 backup ID, row count and schema version.
+
+## Recovery-generation semantics
+
+A generation starts at a successful `restore_base`; `apply_incremental` binds
+to the current generation and contributes the final `data_digest`. A later base
+supersedes earlier generations, so downstream evidence bound to an older
+generation is invalidated even with a higher attempt number. After a recovery
+retry without current-generation evidence, the drill is `inconclusive` unless
+the dataset policy is `evidence_reuse` and the old check proves the identical
+full digest with a valid evidence file. Legacy logs without generation markers
+bypass the gate and retain the original behavior. Chain restorability and
+artifact/evidence hashing are independent of this gate and always run.
 
 ## Objective semantics
 

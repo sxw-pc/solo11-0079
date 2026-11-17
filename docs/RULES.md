@@ -40,6 +40,7 @@ unsafe dataset declaration is rejected while other valid datasets continue.
 | `IN-013` | error | Invalid drill status |
 | `IN-014` | error | Drill identity conflict or dataset/backup mismatch |
 | `IN-015` | error | Finish timestamp precedes start timestamp |
+| `IN-016` | error | Recovery-generation marker malformed or not bound to a restore_base |
 
 Bad rows are rejected with a finding. Rejection is explicit; no malformed row is
 silently dropped.
@@ -77,9 +78,17 @@ a ready artifact on every ancestor. Future rows are never restorable.
 | `EVID-007` | warning | Step retried; retries count toward RTO |
 | `EVID-008` | info | Extra step outside declared procedure |
 | `EVID-009` | high | Drill references a non-restorable backup |
+| `EVID-010` | high | Recovery retried; downstream evidence is not from the current generation |
+| `EVID-011` | medium | Strict replay requires re-verification after a new generation |
+| `EVID-012` | info | Prior verification reused under an identical full data digest |
+| `EVID-013` | high | Verification digest contradicts the current generation digest |
 
 Evidence findings are deduplicated by reference. Drill coverage uses the highest
 attempt per step; retry evidence and all attempts remain available in the log.
+When generation markers are present, a later successful `restore_base`
+invalidates evidence bound to an earlier generation even if its attempt number
+is higher; the drill is then `inconclusive` unless current-generation evidence
+(or policy-authorized identical-digest reuse) proves every downstream step.
 
 ## Consistency — `CONS-*`
 
@@ -89,6 +98,7 @@ attempt per step; retry evidence and all attempts remain available in the log.
 | `CONS-002` | high | `reported_sha256` differs from manifest data hash |
 | `CONS-003` | medium | Required row-count value unavailable or not successful |
 | `CONS-004` | medium | Required checksum value unavailable or not successful |
+| `CONS-005` | high | Final recovery `data_digest` differs from the manifest hash |
 
 If a manifest is unavailable, the catalog row count is used for the row-count
 comparison. Checksum comparison requires a manifest data hash; absence of a

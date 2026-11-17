@@ -29,6 +29,7 @@ Required dataset keys:
 | `owner_team` | non-empty string | Synthetic owner label |
 | `maintenance_window` | non-empty string | Declared window label |
 | `artifact_manifest_path` | safe relative directory | Holds `manifest-<backup_id>.json` |
+| `recovery_evidence_policy` | Optional; `strict_replay` (default) or `evidence_reuse` |
 
 The manifest path is a directory under the fixture root. It is validated before
 any I/O. Each backup resolves to `manifest-<backup_id>.json` inside it.
@@ -87,11 +88,44 @@ One JSON object per line. Required keys:
 | `detail` | String |
 | `rows_restored` | Null or non-negative integer |
 | `reported_sha256` | Null or 64 hexadecimal characters |
+| `recovery_generation` | Optional; lowercase id opened by a successful `restore_base` |
+| `data_digest` | Optional; null or 64 hex chars digest of the restored data object |
 
 All attempts remain in the audit trail. The highest attempt per step is the
 effective outcome; ties are broken by physical line number. Wall-clock RTO uses
 the earliest start and latest finish across all attempts. Malformed JSONL lines
 are rejected with `IN-012` and a physical line number.
+
+### Recovery generations and evidence lineage
+
+Logs without the two optional fields keep the legacy semantics and are read
+unchanged. When either field appears, generation rules apply. A recovery
+generation begins at a successful `restore_base` carrying
+`recovery_generation`; a later successful `restore_base` opens a newer
+generation and invalidates every downstream verification bound to an older
+generation, regardless of attempt number. A successful `apply_incremental`
+must reference the current generation and its `data_digest` becomes the
+generation's final restored-data digest. Downstream steps
+(`verify_rowcount`, `verify_checksum`, `publish_report`) bind to a generation
+and, when a final digest exists, to that digest.
+
+If a recovery step was retried and no current-generation downstream evidence
+exists, the drill cannot inherit old success checks. The dataset's
+`recovery_evidence_policy` selects one business-authorized route:
+
+| Policy | Reuse condition |
+|---|---|
+| `strict_replay` (default) | Never reuse; re-run downstream verification after a new generation. The drill stays `inconclusive` until re-verified. |
+| `evidence_reuse` | Reuse an old check only when the full 64-char `data_digest` equals the current generation digest and its evidence file is valid. |
+
+Matching row counts, backup ids or file names alone never establish identical
+data. A missing digest, a differing digest or an invalid evidence file blocks
+reuse under both policies. Backup-chain restorability and artifact/evidence
+hash checks are unchanged and always apply. A drill with no hard failure but
+unproven lineage is reported `inconclusive`; only `success` can make RTO pass,
+while RTO duration still spans the first attempt through the last finish and
+includes failed retries. The report's drill-evidence ledger lists every adopted,
+reused or invalidated step with the reason.
 
 ## Evidence
 

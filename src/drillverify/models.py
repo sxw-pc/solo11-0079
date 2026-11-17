@@ -80,6 +80,7 @@ class DatasetConfig:
     owner_team: str
     maintenance_window: str
     artifact_manifest_path: str
+    recovery_evidence_policy: str = "strict_replay"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -93,6 +94,7 @@ class DatasetConfig:
             "owner_team": self.owner_team,
             "maintenance_window": self.maintenance_window,
             "artifact_manifest_path": self.artifact_manifest_path,
+            "recovery_evidence_policy": self.recovery_evidence_policy,
         }
 
 
