@@ -1,18 +1,13 @@
 """Recovery-plan loading and strict configuration validation."""
-
 from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
 import yaml
-
 from .models import DatasetConfig, FileFingerprint, Finding, RecoveryPlan
 from .paths import UnsafePath, resolve_under, safe_relative, sha256_file
 from .timeutil import TimestampError, parse_utc
-
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]{2,63}$")
 _STEP_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
 _REQUIRED_DATASET = (
@@ -27,19 +22,13 @@ _REQUIRED_DATASET = (
     "maintenance_window",
     "artifact_manifest_path",
 )
-
-
 @dataclass(frozen=True)
 class PlanLoad:
     plan: RecoveryPlan | None
     findings: tuple[Finding, ...]
     fingerprint: FileFingerprint | None
-
-
 def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
-
-
 def _fingerprint(root: Path, path: Path) -> FileFingerprint | None:
     if not path.is_file():
         return None
@@ -48,8 +37,6 @@ def _fingerprint(root: Path, path: Path) -> FileFingerprint | None:
         sha256=sha256_file(path),
         size_bytes=path.stat().st_size,
     )
-
-
 def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
     """Load and validate recovery_plan.yaml without executing any write."""
     root = fixtures_root.resolve()
@@ -70,7 +57,6 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
             )
         )
         return PlanLoad(None, tuple(findings), None)
-
     fingerprint = _fingerprint(root, path)
     if fingerprint is None:
         findings.append(
@@ -84,9 +70,7 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
             )
         )
         return PlanLoad(None, tuple(findings), None)
-
     file_hash = fingerprint.sha256
-
     def issue(rule: str, message: str, object_id: str, **evidence: Any) -> None:
         findings.append(
             Finding(
@@ -101,34 +85,28 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
                 file_hash,
             )
         )
-
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
         issue("CFG-001", f"Recovery plan cannot be parsed: {type(exc).__name__}.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
-
     if not isinstance(raw, dict):
         issue("CFG-001", "Recovery plan root must be a mapping.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
-
     as_of_raw = raw.get("as_of")
     try:
         as_of = parse_utc(as_of_raw, require_z=True)
     except TimestampError as exc:
         issue("CFG-001", f"as_of is invalid: {exc}.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
-
     window = raw.get("analysis_window_days")
     if not _is_int(window) or not 1 <= window <= 365:
         issue("CFG-001", "analysis_window_days must be an integer from 1 to 365.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
-
     datasets_raw = raw.get("datasets")
     if not isinstance(datasets_raw, list) or not datasets_raw:
         issue("CFG-003", "At least one dataset declaration is required.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
-
     datasets: list[DatasetConfig] = []
     seen: set[str] = set()
     for index, item in enumerate(datasets_raw):
@@ -210,11 +188,9 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
                 artifact_manifest_path=str(item["artifact_manifest_path"]),
             )
         )
-
     if not datasets:
         issue("CFG-003", "No valid dataset declaration remains.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
-
     plan = RecoveryPlan(
         as_of=as_of,
         analysis_window_days=window,

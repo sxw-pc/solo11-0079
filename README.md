@@ -47,6 +47,8 @@ There are no write, execute, rerun, delete or downstream-dispatch endpoints.
 1. Load and validate the recovery plan, catalog CSV and drill JSONL.
 2. Hash every input and reject unsafe fixture paths.
 3. Check artifact files, sizes, SHA-256 values and per-backup manifests.
+   Versioned sharded manifests additionally prove GF(2) shard rank and, when
+   requested, single-fault-domain tolerance without reconstructing any data.
 4. Rebuild full/incremental chains and select restorable points.
 5. Evaluate RPO gaps and drill wall-clock RTO.
 6. Check required steps, evidence, row counts and checksums.

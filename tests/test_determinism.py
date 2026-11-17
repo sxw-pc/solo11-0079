@@ -1,14 +1,9 @@
 from __future__ import annotations
-
 import json
 from pathlib import Path
-
 from drillverify.pipeline import run_pipeline
 from drillverify.reporting import build_report, write_reports
-
 ROOT = Path(__file__).resolve().parents[1]
-
-
 def test_repeated_pipeline_is_byte_deterministic(fixtures_root: Path, bundle):
     repeated = run_pipeline(fixtures_root)
     assert repeated.run_id == bundle.run_id
@@ -20,15 +15,11 @@ def test_repeated_pipeline_is_byte_deterministic(fixtures_root: Path, bundle):
         item.to_dict() for item in bundle.actions
     ]
     assert build_report(repeated) == build_report(bundle)
-
-
 def test_repeated_reports_are_byte_identical(bundle, tmp_path: Path):
     first = write_reports(bundle, tmp_path / "first")
     second = write_reports(bundle, tmp_path / "second")
     for key in first:
         assert first[key].read_bytes() == second[key].read_bytes()
-
-
 def test_expected_demo_snapshots(fixtures_root: Path, bundle, report):
     expected = fixtures_root / "expected"
     summary = json.loads((expected / "demo_summary.json").read_text(encoding="utf-8"))
@@ -55,8 +46,6 @@ def test_expected_demo_snapshots(fixtures_root: Path, bundle, report):
     ]
     assert actual_summary == summary
     assert actual_findings == findings
-
-
 def test_no_runtime_clock_is_used_in_source():
     offenders = []
     for path in (ROOT / "src" / "drillverify").rglob("*.py"):

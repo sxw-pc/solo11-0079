@@ -1,7 +1,5 @@
 """Rule catalogue, categories and deterministic remediation guidance."""
-
 from __future__ import annotations
-
 SEVERITY_RANK = {
     "critical": 0,
     "high": 1,
@@ -11,7 +9,6 @@ SEVERITY_RANK = {
     "low": 5,
     "info": 6,
 }
-
 RULE_TITLES = {
     "CFG-001": "Recovery plan field is invalid",
     "CFG-002": "Duplicate dataset declaration",
@@ -46,6 +43,11 @@ RULE_TITLES = {
     "ART-004": "Artifact size differs from catalog",
     "ART-005": "Artifact SHA-256 differs from catalog",
     "ART-006": "Manifest disagrees with catalog",
+    "ART-007": "Sharded manifest block is malformed",
+    "ART-008": "Shard file is missing or outside the fixture root",
+    "ART-009": "Shard size or SHA-256 differs from the manifest",
+    "ART-010": "Usable shard vectors do not span all source stripes",
+    "ART-011": "A single fault-domain loss leaves the stripes unrecoverable",
     "EVID-001": "Evidence file is missing",
     "EVID-002": "Evidence file is invalid",
     "EVID-004": "Required drill step is missing",
@@ -62,7 +64,6 @@ RULE_TITLES = {
     "OBJ-RPO-001": "Recovery point objective is breached",
     "OBJ-RTO-001": "Recovery time objective is breached",
 }
-
 RULE_CATEGORIES = {
     "CFG": "configuration",
     "IN": "input_quality",
@@ -74,7 +75,6 @@ RULE_CATEGORIES = {
     "OBJ-RPO": "rpo_gap",
     "OBJ-RTO": "rto_gap",
 }
-
 REMEDIATION = {
     "configuration": "Correct the recovery plan and rerun offline validation.",
     "input_quality": "Correct the synthetic source row; never suppress a validation error.",
@@ -87,21 +87,14 @@ REMEDIATION = {
     "rto_gap": "Reduce restore duration or file a reviewed recovery-target change.",
     "general": "Investigate the cited evidence and schedule a controlled re-drill.",
 }
-
 SLA_DAYS = {"critical": 1, "high": 3, "error": 3, "medium": 7, "warning": 14, "low": 14}
-
-
 def category_for(rule_id: str) -> str:
     """Resolve a rule ID to one stable failure-attribution category."""
     for prefix, category in RULE_CATEGORIES.items():
         if rule_id.startswith(prefix + "-"):
             return category
     return "general"
-
-
 def title_for(rule_id: str) -> str:
     return RULE_TITLES.get(rule_id, rule_id)
-
-
 def remediation_for(rule_id: str) -> str:
     return REMEDIATION.get(category_for(rule_id), REMEDIATION["general"])

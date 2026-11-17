@@ -48,11 +48,20 @@ are not secrets. Evidence JSON contains only synthetic IDs and notes.
 
 ## Path confinement
 
-Every declared catalog artifact path, evidence reference and manifest directory
-is normalized and resolved under the fixture root. Absolute paths, drive letters,
-backslashes, traversal components, home expansion and symlink escapes are
-rejected before opening a file. Rejected rows produce errors rather than being
-silently skipped.
+Every declared catalog artifact path, evidence reference, manifest directory and
+sharded-manifest shard path is normalized and resolved under the fixture root.
+Absolute paths, drive letters, backslashes, traversal components, home expansion
+and symlink escapes are rejected before opening a file. Rejected rows produce
+errors rather than being silently skipped.
+
+## Sharded-artifact proof boundary
+
+- Shard verification is static: files are only read for size and SHA-256.
+- No shard is decoded, combined, reconstructed, exported or transmitted.
+- Recoverability is a GF(2) linear-independence proof over verified coefficient
+  vectors, never a file-count or byte-total heuristic.
+- Fault-domain tolerance removes shards conceptually and re-runs elimination;
+  no failure is injected and no storage system is contacted.
 
 ## Determinism and auditability
 

@@ -1,12 +1,9 @@
 """End-to-end orchestration of the offline verification pipeline."""
-
 from __future__ import annotations
-
 from collections import Counter
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
-
 from . import REPORT_VERSION, __version__
 from .actions import AttributionRecord, PlanAction
 from .attribution import attribute
@@ -29,16 +26,11 @@ from .results import (
 )
 from .timeutil import format_utc
 from .validators import validate_catalog, validate_drills
-
-
 class PipelineError(RuntimeError):
     """Raised only when the plan cannot produce a run at all."""
-
     def __init__(self, message: str, findings: tuple[Finding, ...] = ()) -> None:
         super().__init__(message)
         self.findings = findings
-
-
 @dataclass(frozen=True)
 class RunBundle:
     run_id: str
@@ -61,20 +53,15 @@ class RunBundle:
     status: str
     summary: dict[str, Any]
     dataset_summaries: tuple[dict[str, Any], ...]
-
     @property
     def counts(self) -> dict[str, int]:
         return Counter(item.severity for item in self.findings)
-
-
 def _overall_status(findings: tuple[Finding, ...]) -> str:
     if any(item.severity in {"critical", "high", "error"} for item in findings):
         return "fail"
     if any(item.severity in {"medium", "warning"} for item in findings):
         return "warn"
     return "pass"
-
-
 def _dedupe_findings(
     findings: list[Finding], catalog_hash: str, drill_hash: str
 ) -> tuple[Finding, ...]:
@@ -88,8 +75,6 @@ def _dedupe_findings(
                 item = replace(item, input_sha256=drill_hash)
         traced.append(item)
     return tuple(sorted(traced, key=Finding.sort_key))
-
-
 def _dataset_summaries(
     plan: RecoveryPlan,
     findings: tuple[Finding, ...],
@@ -152,8 +137,6 @@ def _dataset_summaries(
             }
         )
     return tuple(rows)
-
-
 def run_pipeline(fixtures_root: Path) -> RunBundle:
     """Run all stages without writing reports or touching a database."""
     root = fixtures_root.resolve()
@@ -161,7 +144,6 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
     if plan_load.plan is None:
         raise PipelineError("Recovery plan is unusable.", plan_load.findings)
     plan = plan_load.plan
-
     catalog_load = load_catalog(root)
     drill_load = load_drills(root)
     catalog = validate_catalog(catalog_load, plan, root)
@@ -201,7 +183,6 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         drill_hash,
     )
     objective_assessment = ObjectiveAssessment(rpo, rto, rpo_findings + rto_findings)
-
     all_findings = list(plan_load.findings)
     all_findings.extend(catalog.findings)
     all_findings.extend(drills.findings)
@@ -213,7 +194,6 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
     findings = _dedupe_findings(all_findings, catalog_hash, drill_hash)
     records, attribution_summary = attribute(findings)
     actions, plan_summary = build_plan(plan, findings, catalog.records, drills.events)
-
     fingerprints: dict[str, FileFingerprint] = {}
     for fingerprint in (
         ([plan_load.fingerprint] if plan_load.fingerprint else [])

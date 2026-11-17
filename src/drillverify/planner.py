@@ -1,10 +1,7 @@
 """Deterministic remediation and re-drill plan generation."""
-
 from __future__ import annotations
-
 from collections import Counter
 from typing import Any
-
 from .actions import PlanAction
 from .models import Finding, RecoveryPlan
 from .paths import sha256_bytes, stable_json
@@ -16,10 +13,7 @@ from .rules import (
     title_for,
 )
 from .timeutil import add_days, format_date
-
 _MATERIAL = {"critical", "high", "error", "medium"}
-
-
 def _dataset_owner(
     finding: Finding,
     owners: dict[str, str],
@@ -35,8 +29,6 @@ def _dataset_owner(
         dataset_id = drill_owner[finding.object_id]
         return dataset_id, owners.get(dataset_id, "unassigned")
     return "", "unassigned"
-
-
 def build_plan(
     plan: RecoveryPlan,
     findings: tuple[Finding, ...],

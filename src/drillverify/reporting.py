@@ -1,23 +1,16 @@
 """Deterministic JSON, Markdown and self-contained HTML report writing."""
-
 from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any
-
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-
 from . import REPORT_VERSION, __version__
 from .paths import stable_json
 from .pipeline import RunBundle
 from .timeutil import format_utc
-
 PACKAGE_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = PACKAGE_DIR / "templates"
 STATIC_DIR = PACKAGE_DIR / "static"
-
-
 def build_report(bundle: RunBundle) -> dict[str, Any]:
     """Assemble the complete, deterministic report document."""
     plan = bundle.plan
@@ -53,19 +46,13 @@ def build_report(bundle: RunBundle) -> dict[str, Any]:
             "actions": [item.to_dict() for item in bundle.actions],
         },
     }
-
-
 def _dump_json(path: Path, value: object) -> None:
     path.write_text(
         json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-
-
 def _cell(value: object) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
-
-
 def render_markdown(report: dict[str, Any]) -> str:
     lines = [
         "# DrillVerify Verification Report",
@@ -127,8 +114,6 @@ def render_markdown(report: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines)
-
-
 def render_html(report: dict[str, Any]) -> str:
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATE_DIR)),
@@ -139,8 +124,6 @@ def render_html(report: dict[str, Any]) -> str:
     template = env.get_template("report.html")
     css = (STATIC_DIR / "app.css").read_text(encoding="utf-8")
     return template.render(report=report, css=css)
-
-
 def write_reports(bundle: RunBundle, out_dir: Path) -> dict[str, Path]:
     """Write all report formats and return a stable path map."""
     out_dir.mkdir(parents=True, exist_ok=True)

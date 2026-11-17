@@ -1,31 +1,22 @@
 """Deterministic backup-chain reconstruction and restorable-point selection."""
-
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
-
 from .models import Finding, RecoveryPlan
 from .records import ArtifactCheck, BackupRecord
 from .results import BackupChainResult, RestorablePoint
 from .timeutil import format_utc
-
-
 @dataclass(frozen=True)
 class ChainAssessment:
     chains: tuple[BackupChainResult, ...]
     points: tuple[RestorablePoint, ...]
     findings: tuple[Finding, ...]
-
-
 @dataclass
 class _State:
     chain_complete: bool
     artifact_ready: bool
     restorable: bool
     failure_rules: list[str]
-
-
 def _cycle_nodes(parent_map: dict[str, str]) -> set[str]:
     members: set[str] = set()
     for start in sorted(parent_map):
@@ -38,8 +29,6 @@ def _cycle_nodes(parent_map: dict[str, str]) -> set[str]:
             seen.append(current)
             current = parent_map[current]
     return members
-
-
 def _chain_finding(
     rule: str,
     severity: str,
@@ -60,8 +49,6 @@ def _chain_finding(
         {"dataset_id": backup.dataset_id, **evidence},
         file_hash,
     )
-
-
 def assess_chains(
     plan: RecoveryPlan,
     backups: tuple[BackupRecord, ...],
@@ -74,7 +61,6 @@ def assess_chains(
     findings: list[Finding] = []
     results: list[BackupChainResult] = []
     points: list[RestorablePoint] = []
-
     for dataset in plan.datasets:
         own = sorted(
             (item for item in backups if item.dataset_id == dataset.dataset_id),
@@ -89,7 +75,6 @@ def assess_chains(
         cycle_nodes = _cycle_nodes(parent_map)
         memo: dict[str, _State] = {}
         active: set[str] = set()
-
         def evaluate(backup_id: str) -> _State:
             if backup_id in memo:
                 return memo[backup_id]
@@ -135,7 +120,6 @@ def assess_chains(
             state = _State(chain_ok, artifact_ok, restorable, sorted(set(failures)))
             memo[backup_id] = state
             return state
-
         for record in own:
             state = evaluate(record.backup_id)
             if record.finished_at > plan.as_of or record.started_at > plan.as_of:
@@ -255,7 +239,6 @@ def assess_chains(
                             schema_version=manifest.schema_version,
                         )
                     )
-
     results.sort(key=lambda item: (item.dataset_id, item.finished_at, item.backup_id))
     points.sort(key=lambda item: (item.dataset_id, item.finished_at, item.backup_id))
     unique_findings = {finding.dedupe_key(): finding for finding in findings}

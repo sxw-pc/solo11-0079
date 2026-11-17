@@ -1,17 +1,12 @@
 """Command-line entry points for offline runs, demos and the review console."""
-
 from __future__ import annotations
-
 import argparse
 import json
 import sys
 from pathlib import Path
-
 from .ledger import record_run
 from .pipeline import PipelineError, run_pipeline
 from .reporting import build_report, write_reports
-
-
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="drillverify",
@@ -30,14 +25,10 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=5000)
     return parser
-
-
 def _print_fatal(findings: tuple) -> None:
     print("DrillVerify could not produce a run:", file=sys.stderr)
     for finding in findings:
         print(f"  {finding.rule_id} {finding.object_id}: {finding.message}", file=sys.stderr)
-
-
 def _print_summary(bundle, outputs: dict[str, Path] | None, db_path: Path | None) -> None:
     payload = {
         "run_id": bundle.run_id,
@@ -49,8 +40,6 @@ def _print_summary(bundle, outputs: dict[str, Path] | None, db_path: Path | None
         "ledger": str(db_path) if db_path else None,
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
-
-
 def _run(args: argparse.Namespace) -> int:
     try:
         bundle = run_pipeline(args.fixtures)
@@ -74,11 +63,8 @@ def _run(args: argparse.Namespace) -> int:
     if args.strict and bundle.status == "fail":
         return 1
     return 0
-
-
 def _serve(args: argparse.Namespace) -> int:
     from .web import serve, validate_bind_host
-
     try:
         validate_bind_host(args.host)
         serve(args.db, args.host, args.port)
@@ -86,8 +72,6 @@ def _serve(args: argparse.Namespace) -> int:
         print(f"DrillVerify could not start: {exc}", file=sys.stderr)
         return 2
     return 0
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)

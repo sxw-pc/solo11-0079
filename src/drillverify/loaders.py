@@ -1,16 +1,12 @@
 """Low-level, offline readers for catalog CSV and drill JSONL inputs."""
-
 from __future__ import annotations
-
 import csv
 import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
 from .models import FileFingerprint, Finding
 from .paths import UnsafePath, resolve_under, safe_relative, sha256_file
-
 CATALOG_COLUMNS = (
     "dataset_id",
     "backup_id",
@@ -24,8 +20,6 @@ CATALOG_COLUMNS = (
     "row_count",
     "schema_version",
 )
-
-
 @dataclass(frozen=True)
 class LoadedRows:
     path: str
@@ -33,8 +27,6 @@ class LoadedRows:
     findings: tuple[Finding, ...]
     fingerprint: FileFingerprint | None
     fatal: bool
-
-
 def _missing_file(rel_path: str, object_id: str) -> LoadedRows:
     finding = Finding(
         "IN-000",
@@ -45,16 +37,12 @@ def _missing_file(rel_path: str, object_id: str) -> LoadedRows:
         rel_path,
     )
     return LoadedRows(rel_path, (), (finding,), None, True)
-
-
 def _fingerprint(root: Path, path: Path) -> FileFingerprint:
     return FileFingerprint(
         path=safe_relative(root, path),
         sha256=sha256_file(path),
         size_bytes=path.stat().st_size,
     )
-
-
 def load_catalog(fixtures_root: Path, rel_path: str = "catalog/backup_catalog.csv") -> LoadedRows:
     """Read every CSV row, preserving physical line numbers."""
     root = fixtures_root.resolve()
@@ -122,8 +110,6 @@ def load_catalog(fixtures_root: Path, rel_path: str = "catalog/backup_catalog.cs
         )
         return LoadedRows(rel, (), tuple(findings), fingerprint, True)
     return LoadedRows(rel, tuple(rows), tuple(findings), fingerprint, False)
-
-
 def _event_issue(
     rel: str,
     line_no: int,
@@ -144,8 +130,6 @@ def _event_issue(
         {},
         file_hash,
     )
-
-
 def load_drills(fixtures_root: Path, rel_path: str = "logs/restore_drill.jsonl") -> LoadedRows:
     """Read every JSONL record and keep malformed-line diagnostics."""
     root = fixtures_root.resolve()

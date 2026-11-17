@@ -71,6 +71,62 @@ reported later with rule IDs.
 expected restored-data checksum reported by drills. It is distinct from the
 catalog `sha256`, which fingerprints the stored artifact file.
 
+### Versioned sharded form — `manifest_version: "2"`
+
+A manifest without `manifest_version` (or `"1"`) keeps the single-file contract
+above. An explicit `"2"` adds a `sharding` block for locally synthesized XOR
+data/parity shards. The catalog `artifact_path` file remains the backup index
+and is still verified with its catalog hash and size; shard paths never replace
+it. Every shard path is confined by the same fixture-root fence.
+
+```json
+{
+  "manifest_version": "2",
+  "backup_id": "bk-orders-001",
+  "row_count": 12000,
+  "data_sha256": "<64 lowercase hex>",
+  "schema_version": "3",
+  "sharding": {
+    "stripe_count": 3,
+    "recovery_purpose": "current",
+    "shards": [
+      {
+        "shard_id": "s1",
+        "coefficients": [1, 0, 0],
+        "path": "artifacts/shards/bk-orders-001/s1.bin",
+        "size_bytes": 64,
+        "sha256": "<64 lowercase hex>",
+        "fault_domain": "zone-a"
+      }
+    ]
+  }
+}
+```
+
+| Key | Type / rule |
+|---|---|
+| `stripe_count` (`k`) | Integer 1–16, the bounded number of source stripes |
+| `recovery_purpose` | `current` or `single_fault_domain` (defaults to `current`) |
+| `shards` | Non-empty list; `shard_id` values are unique strings |
+| `coefficients` | Exactly `k` GF(2) bits, each `0` or `1` |
+| `path` | Safe relative file under the fixture root |
+| `size_bytes` | Non-negative integer, checked against the file |
+| `sha256` | Exactly 64 hexadecimal characters, checked against the file |
+| `fault_domain` | Non-empty string grouping shards that fail together |
+
+Each shard file is verified independently. A missing, escaping, wrong-size or
+wrong-hash shard is unusable and never enters the usable set. The tool performs
+no reconstruction: it runs deterministic GF(2) Gaussian elimination on the
+usable coefficient vectors and proves whether their rank is `k`. File count and
+byte totals never substitute for rank; repeated or zero vectors add no rank.
+The report carries the independent basis, the missing-dimension witness
+vectors and per-shard proofs, never shard contents.
+
+`current` requires the usable matrix to be full rank. `single_fault_domain`
+additionally removes every shard of each fault domain in turn and re-proves
+full rank; it reports the first failing domain and the remaining rank. Shards
+in one fault domain are never counted as independent redundancy.
+
 ## Drill log — `fixtures/logs/restore_drill.jsonl`
 
 One JSON object per line. Required keys:

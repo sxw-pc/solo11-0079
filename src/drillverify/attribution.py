@@ -1,16 +1,10 @@
 """Failure attribution: stable categories, severity and evidence probes."""
-
 from __future__ import annotations
-
 from collections import Counter
-
 from .actions import AttributionRecord
 from .models import Finding
 from .rules import SEVERITY_RANK, category_for
-
 _MATERIAL = {"critical", "high", "error", "medium"}
-
-
 def attribute(findings: tuple[Finding, ...]) -> tuple[tuple[AttributionRecord, ...], dict]:
     """Map every finding to one auditable root-cause category."""
     records = [

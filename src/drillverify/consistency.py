@@ -1,22 +1,15 @@
 """Drill-step completeness and restored-data consistency checks."""
-
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
-
 from .models import Finding, RecoveryPlan
 from .records import ArtifactManifest, BackupRecord, DrillEvent
 from .results import BackupChainResult, DrillSummary
-
-
 @dataclass(frozen=True)
 class DrillAssessment:
     summaries: tuple[DrillSummary, ...]
     findings: tuple[Finding, ...]
     success: dict[str, bool]
-
-
 def _effective(events: list[DrillEvent]) -> dict[str, DrillEvent]:
     """Choose the highest attempt per step, breaking ties by physical line."""
     effective: dict[str, DrillEvent] = {}
@@ -25,8 +18,6 @@ def _effective(events: list[DrillEvent]) -> dict[str, DrillEvent]:
         if current is None or (event.attempt, event.line_no) > (current.attempt, current.line_no):
             effective[event.step] = event
     return effective
-
-
 def _finding(
     rule: str,
     severity: str,
@@ -38,8 +29,6 @@ def _finding(
     **evidence: Any,
 ) -> Finding:
     return Finding(rule, severity, "drill", drill_id, message, path, line, evidence, file_hash)
-
-
 def assess_drills(
     plan: RecoveryPlan,
     events: tuple[DrillEvent, ...],
@@ -60,7 +49,6 @@ def assess_drills(
     summaries: list[DrillSummary] = []
     findings: list[Finding] = []
     success: dict[str, bool] = {}
-
     for drill_id in sorted(grouped):
         drill_events = sorted(grouped[drill_id], key=lambda item: (item.started_at, item.step, item.attempt))
         effective = _effective(drill_events)
@@ -75,7 +63,6 @@ def assess_drills(
         evidence_ok = all(event.evidence_ref in valid_evidence for event in drill_events)
         backup_ready = bool(chain_by_id.get(backup.backup_id) and chain_by_id[backup.backup_id].restorable)
         consistency_ok = True
-
         if missing:
             findings.append(
                 _finding(
@@ -158,7 +145,6 @@ def assess_drills(
                     backup_id=backup.backup_id,
                 )
             )
-
         manifest = manifests.get(backup.backup_id)
         expected_rows = manifest.row_count if manifest else backup.row_count
         expected_sha = manifest.data_sha256 if manifest else None
@@ -227,7 +213,6 @@ def assess_drills(
                     drill_hash,
                 )
             )
-
         drill_ok = (
             not missing
             and not failed
@@ -251,7 +236,6 @@ def assess_drills(
                 evidence_ok=evidence_ok,
             )
         )
-
     return DrillAssessment(
         tuple(sorted(summaries, key=lambda item: item.drill_id)),
         tuple(sorted(findings, key=Finding.sort_key)),

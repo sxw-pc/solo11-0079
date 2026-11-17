@@ -1,11 +1,7 @@
 from __future__ import annotations
-
 from datetime import timedelta
-
 from drillverify.objectives import evaluate_rpo
 from drillverify.results import RestorablePoint
-
-
 def test_rpo_breach_and_pass_are_classified(bundle):
     results = {item.dataset_id: item for item in bundle.rpo}
     assert results["ds-orders"].status == "breach"
@@ -13,8 +9,6 @@ def test_rpo_breach_and_pass_are_classified(bundle):
     assert results["ds-events"].status == "pass"
     assert results["ds-ledger"].status == "no_points"
     assert results["ds-ledger"].point_count == 0
-
-
 def test_rto_includes_failed_attempts(bundle):
     results = {item.drill_id: item for item in bundle.rto}
     assert results["drill-orders-0915"].duration_minutes == 58
@@ -23,8 +17,6 @@ def test_rto_includes_failed_attempts(bundle):
     assert results["drill-orders-1106"].status == "breach"
     assert results["drill-ledger-0908"].status == "not_met"
     assert not results["drill-ledger-0908"].successful
-
-
 def test_rpo_boundary_is_inclusive_passing(bundle):
     dataset = next(item for item in bundle.plan.datasets if item.dataset_id == "ds-events")
     point = RestorablePoint(

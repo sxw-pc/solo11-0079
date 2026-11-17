@@ -20,7 +20,10 @@ cleanup or remote operation.
 | `config.py` | Strict recovery-plan parsing and path confinement |
 | `loaders.py` | CSV/JSONL readers preserving physical line numbers |
 | `validators.py` | Row validation, cross-reference checks, explicit rejection |
-| `evidence.py` | Artifact, manifest and evidence-file integrity |
+| `evidence.py` | Drill-evidence file integrity; re-exports artifact review |
+| `artifact_review.py` | Catalog artifact, versioned manifest and shard orchestration |
+| `shard_evidence.py` | Sharded manifest parsing and per-shard hash verification |
+| `sharding.py` | Deterministic GF(2) rank and fault-domain removal proofs |
 | `backup_chain.py` | Full/incremental chain reconstruction and points |
 | `objectives.py` | RPO gap and wall-clock RTO evaluation |
 | `consistency.py` | Required step coverage, retries, row/hash reconciliation |
@@ -64,6 +67,16 @@ An incremental backup is structurally restorable only when:
 Artifact readiness includes catalog file presence, byte size, file SHA-256 match,
 manifest presence, manifest parse success, and catalog/manifest agreement on
 backup ID, row count and schema version.
+
+A version-2 sharded manifest keeps the catalog artifact as a verified index and
+adds a purely static shard proof. Each shard is fenced to the fixture root and
+checked for presence, size and SHA-256; failing shards are excluded from the
+usable set. Gaussian elimination over GF(2) then proves whether the usable
+coefficient vectors have rank `k`. The `current` purpose needs full rank now;
+`single_fault_domain` re-runs the proof after removing every shard of each
+fault domain and requires full rank for every removal. No data is reconstructed
+and no external storage is accessed. The resulting `artifact_ready` feeds the
+same chain and restorable-point logic as the single-file form.
 
 ## Objective semantics
 

@@ -69,6 +69,11 @@ a ready artifact on every ancestor. Future rows are never restorable.
 | `ART-004` | high | Artifact byte size differs from catalog |
 | `ART-005` | critical | Artifact SHA-256 differs from catalog |
 | `ART-006` | high | Manifest disagrees with catalog backup/row/schema |
+| `ART-007` | high | Sharded (`manifest_version` 2) block is malformed |
+| `ART-008` | high | Shard file missing or its path escapes the fixture root |
+| `ART-009` | high | Shard size or SHA-256 differs from the manifest |
+| `ART-010` | high | Usable shard vectors do not span all `k` source stripes |
+| `ART-011` | high | One fault-domain loss leaves the stripes unrecoverable |
 | `EVID-001` | high | Referenced evidence file missing |
 | `EVID-002` | high | Evidence empty, unreadable or invalid JSON evidence |
 | `EVID-004` | high | Required drill step absent |
@@ -80,6 +85,14 @@ a ready artifact on every ancestor. Future rows are never restorable.
 
 Evidence findings are deduplicated by reference. Drill coverage uses the highest
 attempt per step; retry evidence and all attempts remain available in the log.
+
+Shard findings use the same evidence posture. `ART-008`/`ART-009` mark
+individual shards unusable; they are excluded before the linear proof, so a bad
+shard can never inflate the rank. `ART-010` reports the achieved rank, the
+missing dimensions and unit-vector witnesses. `ART-011` applies only to the
+`single_fault_domain` purpose and names the first domain whose total loss breaks
+full rank, with the remaining rank. Shard counts and byte totals are never used
+as evidence of recoverability.
 
 ## Consistency — `CONS-*`
 

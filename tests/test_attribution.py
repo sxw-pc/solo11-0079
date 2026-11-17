@@ -1,9 +1,6 @@
 from __future__ import annotations
-
 from drillverify.attribution import attribute
 from drillverify.models import Finding
-
-
 def test_attribution_categories_and_probes(bundle):
     assert bundle.attribution_summary["material_count"] == sum(
         1 for item in bundle.attribution if item.material
@@ -14,8 +11,6 @@ def test_attribution_categories_and_probes(bundle):
     for item in bundle.attribution:
         assert item.rule_id.startswith(item.rule_id.split("-")[0])
         assert "file" in item.probe and "input_sha256" in item.probe
-
-
 def test_attribution_is_sorted_by_severity_then_category():
     findings = (
         Finding("IN-006", "error", "backup", "b", "unknown dataset"),

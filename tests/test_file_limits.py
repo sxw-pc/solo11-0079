@@ -1,17 +1,11 @@
 from __future__ import annotations
-
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src" / "drillverify"
 TESTS = ROOT / "tests"
 DOCS = ROOT / "docs"
-
-
 def _line_count(path: Path) -> int:
     return len(path.read_text(encoding="utf-8").splitlines())
-
-
 def test_every_handwritten_file_respects_line_limit():
     files = list(SOURCE.rglob("*.py")) + list(SOURCE.rglob("*.html"))
     files += list(SOURCE.rglob("*.css")) + list(TESTS.rglob("*.py"))
@@ -19,14 +13,10 @@ def test_every_handwritten_file_respects_line_limit():
     files.append(ROOT / "README.md")
     oversized = {path.relative_to(ROOT).as_posix(): _line_count(path) for path in files if _line_count(path) > 300}
     assert oversized == {}
-
-
 def test_python_code_size_is_in_required_range():
     python_files = list(SOURCE.rglob("*.py")) + list(TESTS.rglob("*.py"))
     total = sum(_line_count(path) for path in python_files)
     assert 2500 <= total <= 4500, f"Python source + tests is {total} lines"
-
-
 def test_required_files_exist():
     required = [
         "Makefile", "README.md", "pyproject.toml", "requirements.txt",

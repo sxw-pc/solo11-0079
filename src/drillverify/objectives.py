@@ -1,23 +1,16 @@
 """RPO and RTO objective evaluation."""
-
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Mapping
-
 from .models import Finding, RecoveryPlan
 from .records import DrillEvent
 from .results import RestorablePoint, RpoResult, RtoResult
 from .timeutil import format_utc, minutes_between
-
-
 @dataclass(frozen=True)
 class ObjectiveAssessment:
     rpo: tuple[RpoResult, ...]
     rto: tuple[RtoResult, ...]
     findings: tuple[Finding, ...]
-
-
 def evaluate_rpo(
     plan: RecoveryPlan,
     points: tuple[RestorablePoint, ...],
@@ -110,8 +103,6 @@ def evaluate_rpo(
                 )
             )
     return tuple(results), tuple(findings)
-
-
 def evaluate_rto(
     plan: RecoveryPlan,
     events: tuple[DrillEvent, ...],

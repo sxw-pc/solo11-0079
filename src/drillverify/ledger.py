@@ -1,15 +1,11 @@
 """Append-only SQLite audit ledger with a read-only query surface."""
-
 from __future__ import annotations
-
 import json
 import sqlite3
 from pathlib import Path
 from typing import Any
-
 from .pipeline import RunBundle
 from .rules import category_for
-
 SCHEMA_VERSION = 1
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -81,8 +77,6 @@ CREATE TABLE IF NOT EXISTS actions (
   payload_json TEXT NOT NULL
 );
 """
-
-
 def _write_connection(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(str(path))
@@ -91,8 +85,6 @@ def _write_connection(path: Path) -> sqlite3.Connection:
     connection.executescript(_SCHEMA)
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     return connection
-
-
 def _read_connection(path: Path) -> sqlite3.Connection:
     if not path.is_file():
         raise FileNotFoundError(f"ledger not found: {path}")
@@ -100,8 +92,6 @@ def _read_connection(path: Path) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA query_only = ON")
     return connection
-
-
 def record_run(db_path: Path, bundle: RunBundle, report: dict[str, Any]) -> int:
     """Append one run and its normalized audit rows; return the ledger row ID."""
     connection = _write_connection(db_path)
@@ -185,8 +175,6 @@ def record_run(db_path: Path, bundle: RunBundle, report: dict[str, Any]) -> int:
         return run_pk
     finally:
         connection.close()
-
-
 def list_runs(db_path: Path) -> list[dict[str, Any]]:
     connection = _read_connection(db_path)
     try:
@@ -205,8 +193,6 @@ def list_runs(db_path: Path) -> list[dict[str, Any]]:
         ]
     finally:
         connection.close()
-
-
 def get_run(db_path: Path, run_pk: int) -> dict[str, Any] | None:
     connection = _read_connection(db_path)
     try:
@@ -225,8 +211,6 @@ def get_run(db_path: Path, run_pk: int) -> dict[str, Any] | None:
         }
     finally:
         connection.close()
-
-
 def get_findings(
     db_path: Path,
     run_pk: int,
@@ -263,8 +247,6 @@ def get_findings(
         ]
     finally:
         connection.close()
-
-
 def get_actions(db_path: Path, run_pk: int) -> list[dict[str, Any]]:
     connection = _read_connection(db_path)
     try:

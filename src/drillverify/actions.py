@@ -1,13 +1,8 @@
 """Attribution and remediation action types."""
-
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
-
 from .rules import SEVERITY_RANK
-
-
 @dataclass(frozen=True)
 class AttributionRecord:
     category: str
@@ -18,7 +13,6 @@ class AttributionRecord:
     root_cause: str
     material: bool
     probe: dict[str, Any]
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "category": self.category,
@@ -30,8 +24,6 @@ class AttributionRecord:
             "material": self.material,
             "probe": self.probe,
         }
-
-
 @dataclass(frozen=True)
 class PlanAction:
     action_id: str
@@ -48,7 +40,6 @@ class PlanAction:
     instruction: str
     due_at: str
     probes: tuple[dict[str, Any], ...]
-
     def sort_key(self) -> tuple[Any, ...]:
         return (
             SEVERITY_RANK.get(self.priority, 99),
@@ -56,7 +47,6 @@ class PlanAction:
             self.dataset_id,
             self.action_id,
         )
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "action_id": self.action_id,

@@ -1,18 +1,11 @@
 """Read-only local review console. No write route and no remote bind by default."""
-
 from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
-
 from flask import Flask, abort, render_template, request
-
 from .ledger import get_actions, get_findings, get_run, list_runs
-
 ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
-
-
 def validate_bind_host(host: str) -> str:
     """Reject any address other than explicit loopback aliases."""
     if host not in ALLOWED_HOSTS:
@@ -21,15 +14,11 @@ def validate_bind_host(host: str) -> str:
             f"allowed hosts: {', '.join(sorted(ALLOWED_HOSTS))}"
         )
     return host
-
-
 def _run_or_404(db_path: Path, run_pk: int) -> dict[str, Any]:
     run = get_run(db_path, run_pk)
     if run is None:
         abort(404)
     return run
-
-
 def create_app(db_path: Path) -> Flask:
     """Build the local review app around an existing SQLite ledger."""
     app = Flask(
@@ -42,16 +31,13 @@ def create_app(db_path: Path) -> Flask:
         READ_ONLY=True,
         JSON_SORT_KEYS=True,
     )
-
     @app.before_request
     def enforce_read_only() -> None:
         if request.method not in READ_METHODS:
             abort(405)
-
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
         return {"status": "ok", "read_only": True}
-
     @app.get("/")
     def index() -> str:
         try:
@@ -59,13 +45,11 @@ def create_app(db_path: Path) -> Flask:
         except FileNotFoundError:
             runs = []
         return render_template("index.html", runs=runs)
-
     @app.get("/runs/<int:run_pk>")
     def run_detail(run_pk: int) -> str:
         run = _run_or_404(db_path, run_pk)
         report = run["report"]
         return render_template("run_detail.html", run=run, report=report)
-
     @app.get("/runs/<int:run_pk>/datasets/<dataset_id>")
     def dataset_detail(run_pk: int, dataset_id: str) -> str:
         run = _run_or_404(db_path, run_pk)
@@ -102,7 +86,6 @@ def create_app(db_path: Path) -> Flask:
             drills=drills,
             findings=findings,
         )
-
     @app.get("/runs/<int:run_pk>/findings")
     def findings(run_pk: int) -> str:
         run = _run_or_404(db_path, run_pk)
@@ -117,7 +100,6 @@ def create_app(db_path: Path) -> Flask:
             selected_severity=severity or "",
             query=query or "",
         )
-
     @app.get("/runs/<int:run_pk>/plan")
     def plan(run_pk: int) -> str:
         run = _run_or_404(db_path, run_pk)
@@ -128,18 +110,13 @@ def create_app(db_path: Path) -> Flask:
             report=run["report"],
             actions=actions,
         )
-
     @app.errorhandler(404)
     def not_found(error: Exception) -> tuple[str, int]:
         return render_template("not_found.html"), 404
-
     @app.errorhandler(405)
     def method_not_allowed(error: Exception) -> tuple[str, int]:
         return "Read-only console: method not allowed.\n", 405
-
     return app
-
-
 def serve(db_path: Path, host: str = "127.0.0.1", port: int = 5000) -> None:
     """Run the review console with the Werkzeug development server, loopback only."""
     host = validate_bind_host(host)

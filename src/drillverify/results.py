@@ -1,14 +1,9 @@
 """Result types for chains, objectives and drill assessments."""
-
 from __future__ import annotations
-
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-
 from .timeutil import format_utc
-
-
 @dataclass(frozen=True)
 class BackupChainResult:
     dataset_id: str
@@ -19,7 +14,6 @@ class BackupChainResult:
     artifact_ready: bool
     restorable: bool
     failure_rules: tuple[str, ...]
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "dataset_id": self.dataset_id,
@@ -31,8 +25,6 @@ class BackupChainResult:
             "restorable": self.restorable,
             "failure_rules": list(self.failure_rules),
         }
-
-
 @dataclass(frozen=True)
 class RestorablePoint:
     dataset_id: str
@@ -41,7 +33,6 @@ class RestorablePoint:
     row_count: int
     data_sha256: str
     schema_version: str
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "dataset_id": self.dataset_id,
@@ -51,8 +42,6 @@ class RestorablePoint:
             "data_sha256": self.data_sha256,
             "schema_version": self.schema_version,
         }
-
-
 @dataclass(frozen=True)
 class RpoResult:
     dataset_id: str
@@ -64,7 +53,6 @@ class RpoResult:
     gap_to: str | None
     last_point_at: str | None
     minutes_since_last_point: int | None
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "dataset_id": self.dataset_id,
@@ -77,8 +65,6 @@ class RpoResult:
             "last_point_at": self.last_point_at,
             "minutes_since_last_point": self.minutes_since_last_point,
         }
-
-
 @dataclass(frozen=True)
 class RtoResult:
     drill_id: str
@@ -90,7 +76,6 @@ class RtoResult:
     started_at: str
     finished_at: str
     successful: bool
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "drill_id": self.drill_id,
@@ -103,8 +88,6 @@ class RtoResult:
             "finished_at": self.finished_at,
             "successful": self.successful,
         }
-
-
 @dataclass(frozen=True)
 class DrillSummary:
     drill_id: str
@@ -117,7 +100,6 @@ class DrillSummary:
     failed_steps: tuple[str, ...]
     skipped_steps: tuple[str, ...]
     evidence_ok: bool
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "drill_id": self.drill_id,

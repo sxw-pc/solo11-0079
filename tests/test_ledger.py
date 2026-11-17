@@ -1,16 +1,10 @@
 from __future__ import annotations
-
 import sqlite3
 from pathlib import Path
-
 from drillverify.ledger import get_actions, get_findings, get_run, list_runs, record_run
 from drillverify.reporting import build_report
-
-
 def _record(db: Path, bundle) -> int:
     return record_run(db, bundle, build_report(bundle))
-
-
 def test_ledger_records_normalized_rows(bundle, tmp_path: Path):
     db = tmp_path / "ledger.sqlite3"
     first = _record(db, bundle)
@@ -21,8 +15,6 @@ def test_ledger_records_normalized_rows(bundle, tmp_path: Path):
     assert runs[0]["summary"] == bundle.summary
     assert get_run(db, first)["report"]["run_id"] == bundle.run_id
     assert get_run(db, 999) is None
-
-
 def test_ledger_finding_filters_and_actions(bundle, tmp_path: Path):
     db = tmp_path / "ledger.sqlite3"
     run_pk = _record(db, bundle)
@@ -40,8 +32,6 @@ def test_ledger_finding_filters_and_actions(bundle, tmp_path: Path):
     actions = get_actions(db, run_pk)
     assert len(actions) == len(bundle.actions)
     assert actions[0]["action_id"] == bundle.actions[0].action_id
-
-
 def test_ledger_tables_persist_input_hashes(bundle, tmp_path: Path):
     db = tmp_path / "ledger.sqlite3"
     run_pk = _record(db, bundle)
@@ -58,8 +48,6 @@ def test_ledger_tables_persist_input_hashes(bundle, tmp_path: Path):
         connection.close()
     assert count == len(bundle.inputs)
     assert category == "chain_integrity"
-
-
 def test_missing_ledger_is_explicit(tmp_path: Path):
     try:
         list_runs(tmp_path / "absent.sqlite3")
