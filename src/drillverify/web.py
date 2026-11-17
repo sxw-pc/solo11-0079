@@ -7,7 +7,7 @@ from typing import Any
 
 from flask import Flask, abort, render_template, request
 
-from .ledger import get_actions, get_findings, get_run, list_runs
+from .ledger import get_actions, get_findings, get_run, get_shared_releases, list_runs
 
 ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -127,6 +127,41 @@ def create_app(db_path: Path) -> Flask:
             run=run,
             report=run["report"],
             actions=actions,
+        )
+
+    @app.get("/runs/<int:run_pk>/shared")
+    def shared(run_pk: int) -> str:
+        # The shared exit serves exactly the frozen release cube recorded for
+        # this run: no severity/q/owner filtering, no drill-down, no slices.
+        if request.args:
+            abort(400)
+        _run_or_404(db_path, run_pk)
+        releases = get_shared_releases(db_path, run_pk)
+        if not releases:
+            abort(404)
+        views = []
+        for release in releases:
+            cube = release["cube"]
+            views.append(
+                {
+                    "release": release,
+                    "cell_map": {
+                        (cell["row"], cell["column"]): cell for cell in cube["cells"]
+                    },
+                    "row_totals": {total["row"]: total for total in cube["row_totals"]},
+                    "column_totals": {
+                        total["column"]: total for total in cube["column_totals"]
+                    },
+                }
+            )
+        return render_template("shared.html", run_pk=run_pk, views=views)
+
+    @app.errorhandler(400)
+    def bad_request(error: Exception) -> tuple[str, int]:
+        return (
+            "Shared statistics releases are fixed cubes: "
+            "query parameters are not supported.\n",
+            400,
         )
 
     @app.errorhandler(404)

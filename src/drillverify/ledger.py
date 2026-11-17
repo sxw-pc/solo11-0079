@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from .pipeline import RunBundle
+from .reporting import SHARED_ARTIFACT_KIND
 from .rules import category_for
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,6 +80,13 @@ CREATE TABLE IF NOT EXISTS actions (
   rule_ids TEXT NOT NULL,
   due_at TEXT NOT NULL,
   payload_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS shared_releases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_pk INTEGER NOT NULL REFERENCES runs(id),
+  contract TEXT NOT NULL,
+  artifact_json TEXT NOT NULL,
+  UNIQUE(run_pk, contract)
 );
 """
 
@@ -187,6 +195,35 @@ def record_run(db_path: Path, bundle: RunBundle, report: dict[str, Any]) -> int:
         connection.close()
 
 
+def record_shared_releases(
+    db_path: Path, run_pk: int, artifacts: tuple[dict[str, Any], ...]
+) -> None:
+    """Attach certified shared statistics cubes to an existing ledger run.
+
+    Only artifacts carrying an optimal disclosure certificate are accepted;
+    an unproven or infeasible candidate table never enters the ledger.
+    """
+    connection = _write_connection(db_path)
+    try:
+        with connection:
+            for artifact in artifacts:
+                if artifact.get("artifact_kind") != SHARED_ARTIFACT_KIND:
+                    raise ValueError(f"not a shared statistics release: {artifact.get('artifact_kind')!r}")
+                certificate = artifact.get("certificate") or {}
+                if certificate.get("status") != "optimal":
+                    raise ValueError("shared statistics release without an optimal certificate")
+                connection.execute(
+                    "INSERT INTO shared_releases(run_pk, contract, artifact_json) VALUES (?, ?, ?)",
+                    (
+                        run_pk,
+                        artifact["contract"]["name"],
+                        json.dumps(artifact, ensure_ascii=False, sort_keys=True),
+                    ),
+                )
+    finally:
+        connection.close()
+
+
 def list_runs(db_path: Path) -> list[dict[str, Any]]:
     connection = _read_connection(db_path)
     try:
@@ -273,5 +310,23 @@ def get_actions(db_path: Path, run_pk: int) -> list[dict[str, Any]]:
             (run_pk,),
         ).fetchall()
         return [json.loads(row["payload_json"]) for row in rows]
+    finally:
+        connection.close()
+
+
+def get_shared_releases(db_path: Path, run_pk: int) -> list[dict[str, Any]]:
+    """Frozen shared statistics cubes for one run; [] on pre-shared ledgers."""
+    connection = _read_connection(db_path)
+    try:
+        exists = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shared_releases'"
+        ).fetchone()
+        if exists is None:
+            return []
+        rows = connection.execute(
+            "SELECT artifact_json FROM shared_releases WHERE run_pk = ? ORDER BY contract ASC",
+            (run_pk,),
+        ).fetchall()
+        return [json.loads(row["artifact_json"]) for row in rows]
     finally:
         connection.close()

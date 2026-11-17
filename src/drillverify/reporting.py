@@ -9,6 +9,15 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from . import REPORT_VERSION, __version__
+from .disclosure import (
+    OPTIMAL,
+    DisclosureError,
+    DisclosurePolicy,
+    ReleaseDecision,
+    SearchBudget,
+    build_count_table,
+    build_release,
+)
 from .paths import stable_json
 from .pipeline import RunBundle
 from .timeutil import format_utc
@@ -16,6 +25,20 @@ from .timeutil import format_utc
 PACKAGE_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = PACKAGE_DIR / "templates"
 STATIC_DIR = PACKAGE_DIR / "static"
+
+SHARED_ARTIFACT_KIND = "shared_statistics_release"
+
+_GUARANTEE = (
+    "Within this fixed table and the declared non-negative integer cell upper "
+    "bound, every protected cell admits at least two complete legal table "
+    "completions consistent with everything published here, so it cannot be "
+    "exactly reconstructed from this artifact alone."
+)
+_LIMITATIONS = (
+    "This certificate is not differential privacy and does not protect against "
+    "external knowledge, other releases, slice subtraction outside this fixed "
+    "cube, or future runs."
+)
 
 
 def build_report(bundle: RunBundle) -> dict[str, Any]:
@@ -51,6 +74,111 @@ def build_report(bundle: RunBundle) -> dict[str, Any]:
         "remediation_plan": {
             "summary": bundle.plan_summary,
             "actions": [item.to_dict() for item in bundle.actions],
+        },
+    }
+
+
+def build_shared_report(
+    bundle: RunBundle,
+    policy: DisclosurePolicy,
+    budget: SearchBudget | None = None,
+) -> dict[str, Any]:
+    """Build the frozen shared statistics cube for one authorized contract.
+
+    Raises DisclosureError when the release decision is not a proven optimum:
+    an unproven or infeasible candidate table is never published.
+    """
+    table = build_count_table(bundle.plan, bundle.findings, bundle.backups, bundle.events)
+    decision = build_release(table, policy, budget)
+    if decision.status != OPTIMAL:
+        raise DisclosureError(
+            f"shared statistics release '{policy.name}' is not publishable: "
+            f"{decision.status} ({decision.detail})"
+        )
+    return build_shared_artifact(decision, bundle.run_id, format_utc(bundle.plan.as_of))
+
+
+def build_shared_artifact(
+    decision: ReleaseDecision, run_id: str, as_of: str
+) -> dict[str, Any]:
+    """Freeze one proven-optimal release decision into the shared JSON cube."""
+    table = decision.table
+    policy = decision.policy
+    published = dict(decision.published)
+    suppressed = {item.item: item.reason for item in decision.suppressed}
+
+    def entry(item_id: str, keys: dict[str, str], source: dict[str, str]) -> dict[str, Any]:
+        if item_id in published:
+            return {**keys, "status": "published", "value": published[item_id], "source": source}
+        return {**keys, "status": "suppressed", "reason": suppressed[item_id]}
+
+    cube_rows = [
+        {"dataset_id": row_id, "owner_team": owner}
+        for row_id, owner in zip(table.rows, table.row_owners)
+    ]
+    cells = [
+        entry(
+            f"cell:{row_id}/{column}",
+            {"row": row_id, "column": column},
+            {"kind": "finding_count", "dataset_id": row_id, "severity": column},
+        )
+        for row_id in table.rows
+        for column in table.columns
+    ]
+    row_totals = [
+        entry(f"row_total:{row_id}", {"row": row_id}, {"kind": "row_total", "dataset_id": row_id})
+        for row_id in table.rows
+    ]
+    column_totals = [
+        entry(
+            f"column_total:{column}",
+            {"column": column},
+            {"kind": "column_total", "severity": column},
+        )
+        for column in table.columns
+    ]
+    grand_total = entry("grand_total", {}, {"kind": "grand_total"})
+    return {
+        "schema_version": REPORT_VERSION,
+        "artifact_kind": SHARED_ARTIFACT_KIND,
+        "tool": {"name": "drillverify", "version": __version__},
+        "run_id": run_id,
+        "generated_at": as_of,
+        "as_of": as_of,
+        "contract": {
+            "name": policy.name,
+            "low_count_threshold": policy.low_count_threshold,
+            "cell_upper_bound": policy.cell_upper_bound,
+            "keep_marginals": policy.keep_marginals,
+            "weights": {
+                "cell": policy.weights.cell,
+                "row_total": policy.weights.row_total,
+                "column_total": policy.weights.column_total,
+                "grand_total": policy.weights.grand_total,
+            },
+        },
+        "cube": {
+            "rows": cube_rows,
+            "columns": list(table.columns),
+            "cells": cells,
+            "row_totals": row_totals,
+            "column_totals": column_totals,
+            "grand_total": grand_total,
+        },
+        "certificate": {
+            "status": decision.status,
+            "proof_method": "exact_branch_and_bound",
+            "released_weight": decision.released_weight,
+            "available_weight": decision.available_weight,
+            "release_nodes": decision.release_nodes,
+            "oracle_nodes": decision.oracle_nodes,
+            "sensitive_cells": sorted({w.cell for w in decision.witnesses}),
+            "witnesses": [
+                {"cell": w.cell, "value": w.value, "table": [list(r) for r in w.table]}
+                for w in decision.witnesses
+            ],
+            "guarantee": _GUARANTEE,
+            "limitations": _LIMITATIONS,
         },
     }
 
@@ -141,8 +269,18 @@ def render_html(report: dict[str, Any]) -> str:
     return template.render(report=report, css=css)
 
 
-def write_reports(bundle: RunBundle, out_dir: Path) -> dict[str, Path]:
-    """Write all report formats and return a stable path map."""
+def write_reports(
+    bundle: RunBundle,
+    out_dir: Path,
+    shared_policies: tuple[DisclosurePolicy, ...] = (),
+) -> dict[str, Path]:
+    """Write all report formats and return a stable path map.
+
+    With no ``shared_policies`` this writes exactly the classic full internal
+    report set. Each listed contract adds one frozen shared statistics cube;
+    a contract whose release decision is not a proven optimum raises
+    DisclosureError and no candidate table is written.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     report = build_report(bundle)
     outputs: dict[str, Path] = {
@@ -179,4 +317,9 @@ def write_reports(bundle: RunBundle, out_dir: Path) -> dict[str, Path]:
             "inputs": [item.to_dict() for item in bundle.inputs],
         },
     )
+    for policy in shared_policies:
+        artifact = build_shared_report(bundle, policy)
+        path = out_dir / f"shared_report_{policy.name}.json"
+        _dump_json(path, artifact)
+        outputs[f"shared:{policy.name}"] = path
     return outputs

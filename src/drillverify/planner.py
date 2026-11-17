@@ -20,7 +20,7 @@ from .timeutil import add_days, format_date
 _MATERIAL = {"critical", "high", "error", "medium"}
 
 
-def _dataset_owner(
+def dataset_owner(
     finding: Finding,
     owners: dict[str, str],
     backup_owner: dict[str, str],
@@ -51,7 +51,7 @@ def build_plan(
     for finding in findings:
         if finding.severity not in _MATERIAL:
             continue
-        dataset_id, owner = _dataset_owner(finding, owners, backup_owner, drill_owner)
+        dataset_id, owner = dataset_owner(finding, owners, backup_owner, drill_owner)
         category = category_for(finding.rule_id)
         key = (category, owner, dataset_id, finding.object_type, finding.object_id)
         groups.setdefault(key, []).append(finding)

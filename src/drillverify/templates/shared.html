@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shared statistics release · DrillVerify</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">Drill<span>Verify</span></div>
+    <span class="local-badge">shared statistics release</span>
+  </div>
+</header>
+<main>
+  <p class="muted">Fixed release cube · ledger run #{{ run_pk }}</p>
+  <h1>Shared statistics release</h1>
+  <p class="lede">
+    Statistics-only extract computed once at release time. It contains no
+    finding-level detail, accepts no filters or slices, and links to no other
+    report. Suppressed cells are marked explicitly with their suppression
+    reason; they are never left blank.
+  </p>
+
+  {% for view in views %}
+  {% set release = view.release %}
+  {% set cube = release.cube %}
+  {% set certificate = release.certificate %}
+  <h2>Contract: <code>{{ release.contract.name }}</code></h2>
+  <div class="cards">
+    <div class="card"><div class="label">Certificate</div><div class="value">{{ certificate.status }}</div></div>
+    <div class="card"><div class="label">Released weight</div><div class="value">{{ certificate.released_weight }} / {{ certificate.available_weight }}</div></div>
+    <div class="card"><div class="label">Protected cells</div><div class="value">{{ certificate.sensitive_cells|length }}</div></div>
+    <div class="card"><div class="label">Witnesses</div><div class="value">{{ certificate.witnesses|length }}</div></div>
+  </div>
+  <div class="panel">
+    <table>
+      <thead>
+        <tr>
+          <th>Dataset · owner</th>
+          {% for column in cube.columns %}<th class="numeric">{{ column }}</th>{% endfor %}
+          <th class="numeric">Row total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in cube.rows %}
+        <tr>
+          <td><strong>{{ row.dataset_id }}</strong><br><span class="muted small">{{ row.owner_team }}</span></td>
+          {% for column in cube.columns %}
+            {% set cell = view.cell_map[(row.dataset_id, column)] %}
+            {% if cell.status == 'published' %}
+            <td class="numeric">{{ cell.value }}</td>
+            {% else %}
+            <td class="numeric"><span class="badge">suppressed</span><br><span class="muted small">{{ cell.reason }}</span></td>
+            {% endif %}
+          {% endfor %}
+          {% set total = view.row_totals[row.dataset_id] %}
+          {% if total.status == 'published' %}
+          <td class="numeric"><strong>{{ total.value }}</strong></td>
+          {% else %}
+          <td class="numeric"><span class="badge">suppressed</span><br><span class="muted small">{{ total.reason }}</span></td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        <tr>
+          <td><strong>Column total</strong></td>
+          {% for column in cube.columns %}
+            {% set total = view.column_totals[column] %}
+            {% if total.status == 'published' %}
+            <td class="numeric"><strong>{{ total.value }}</strong></td>
+            {% else %}
+            <td class="numeric"><span class="badge">suppressed</span><br><span class="muted small">{{ total.reason }}</span></td>
+            {% endif %}
+          {% endfor %}
+          {% set grand = cube.grand_total %}
+          {% if grand.status == 'published' %}
+          <td class="numeric"><strong>{{ grand.value }}</strong></td>
+          {% else %}
+          <td class="numeric"><span class="badge">suppressed</span><br><span class="muted small">{{ grand.reason }}</span></td>
+          {% endif %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <h3>Disclosure certificate</h3>
+    <dl class="detail-grid">
+      <dt>Proof method</dt><dd><code>{{ certificate.proof_method }}</code></dd>
+      <dt>Low-count threshold</dt><dd>{{ release.contract.low_count_threshold }}</dd>
+      <dt>Declared cell upper bound</dt><dd>{{ release.contract.cell_upper_bound }}</dd>
+      <dt>Search nodes</dt><dd>{{ certificate.release_nodes }} release · {{ certificate.oracle_nodes }} oracle</dd>
+      <dt>Guarantee</dt><dd>{{ certificate.guarantee }}</dd>
+      <dt>Limitations</dt><dd>{{ certificate.limitations }}</dd>
+    </dl>
+  </div>
+  {% endfor %}
+</main>
+<footer>
+  Shared statistics release. Values are counts of run findings per
+  dataset/owner team and severity; every published field carries its source
+  in the JSON artifact.
+</footer>
+</body>
+</html>
