@@ -5,3 +5,10 @@ __pycache__/
 outputs/
 *.sqlite3
 *.sqlite3-journal
+venv/
+node_modules/
+*.pyc
+.coverage
+.benchmarks/
+.env
+dist/
