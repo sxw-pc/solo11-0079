@@ -8,6 +8,8 @@ from typing import Any
 from flask import Flask, abort, render_template, request
 
 from .ledger import get_actions, get_findings, get_run, list_runs
+from .trend import DEFAULT_ALPHA, DEFAULT_BUDGET, build_spec, load_observations
+from .trend_test import analyze_observations
 
 ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -128,6 +130,46 @@ def create_app(db_path: Path) -> Flask:
             report=run["report"],
             actions=actions,
         )
+
+    @app.get("/trend")
+    def trend() -> str:
+        """Audit trend console: declared windows, strata, exact p and alert state."""
+        mode = request.args.get("mode", "overview").strip()[:20]
+        metrics = request.args.get("metrics", "").strip()[:400]
+        baseline = request.args.get("baseline", "").strip()[:4000]
+        recent = request.args.get("recent", "").strip()[:4000]
+        alpha = request.args.get("alpha", str(DEFAULT_ALPHA)).strip()[:12]
+        budget = request.args.get("budget", str(DEFAULT_BUDGET)).strip()[:12]
+        try:
+            spec = build_spec(
+                mode,
+                [item for item in metrics.split(",") if item.strip()],
+                [item for item in baseline.split(",") if item.strip()],
+                [item for item in recent.split(",") if item.strip()],
+                alpha=float(alpha),
+                max_permutations=int(budget),
+            )
+        except ValueError:
+            abort(400)
+        declared = bool(spec.metrics and spec.baseline_run_ids and spec.recent_run_ids)
+        result: dict[str, Any] | None = None
+        ledger_present = True
+        try:
+            observations, duplicates = load_observations(db_path)
+        except FileNotFoundError:
+            observations, duplicates, ledger_present = [], [], False
+        if declared:
+            result = analyze_observations(observations, duplicates, spec)
+        return render_template(
+            "trend.html", runs=list_runs(db_path) if ledger_present else [],
+            result=result, spec=spec, declared=declared, ledger_present=ledger_present,
+            query={"mode": mode, "metrics": metrics, "baseline": baseline,
+                   "recent": recent, "alpha": alpha, "budget": budget},
+        )
+
+    @app.errorhandler(400)
+    def bad_request(error: Exception) -> tuple[str, int]:
+        return "Invalid trend declaration.\n", 400
 
     @app.errorhandler(404)
     def not_found(error: Exception) -> tuple[str, int]:

@@ -28,6 +28,8 @@ cleanup or remote operation.
 | `planner.py` | Deterministic owner-assigned remediation actions |
 | `reporting.py` | JSON, Markdown and self-contained HTML output |
 | `ledger.py` | Append-only SQLite audit rows and query-only reads |
+| `trend.py` | Ledger snapshots collapsed into comparable run observations |
+| `trend_test.py` | Exact exposure-stratified permutation test and alert regimes |
 | `web.py` | Local read-only Flask review console |
 | `pipeline.py` | Ordered orchestration and run-level status |
 | `cli.py` | `run`, `demo`, `validate` and `serve` entry points |
@@ -104,3 +106,29 @@ objective, chain, drill and action rows. The console reads through query-only
 SQLite connections. Pages are small Jinja templates with shared local CSS; there
 is no front-end build chain or browser automation. Route IDs are integer ledger
 rows, while report identity remains the stable content-derived run ID.
+
+## Audit trend design
+
+`trend.py` builds de-duplicated observations from full ledger snapshots and
+`trend_test.py` runs the exact permutation test. A report's `comparability` block
+records plan dataset scope, `rule_version` and the analysis-window convention so
+runs from different plans are never pooled.
+
+- Each distinct `run_id` is one observation; duplicate ledger rows are audited
+  but counted once, and conflicting duplicates poison the comparison.
+- A metric is `rule:<id>`, `severity:<name>` or `category:<name>`. It fires when
+  a material finding of that kind appears anywhere in the run; finding counts are
+  never used as sample size.
+- Runs are stratified by `(backup_count, drill_count)`; only layers with both
+  windows contribute, and unmatched runs are listed as excluded.
+- Within each layer, labels are permuted over every combination of the declared
+  window sizes. The statistic is the run-weighted recent-minus-baseline event
+  rate. Ties count as at least as extreme, giving a one-sided exact p.
+- The duty regime decides on the single declared metric. The overview regime
+  decides on the permutation distribution of the maximum statistic across the
+  full pre-registered family, and exposes raw p values only for audit.
+- The search space is compared with a declared budget before enumeration; an
+  oversized space yields `unproven`, not an approximation.
+
+The trend view is additive: single-run chains, RPO/RTO, attribution and the
+remediation plan are untouched.

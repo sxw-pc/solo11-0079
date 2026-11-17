@@ -8,7 +8,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from . import REPORT_VERSION, __version__
+from . import REPORT_VERSION, RULE_VERSION, __version__
 from .paths import stable_json
 from .pipeline import RunBundle
 from .timeutil import format_utc
@@ -21,10 +21,16 @@ STATIC_DIR = PACKAGE_DIR / "static"
 def build_report(bundle: RunBundle) -> dict[str, Any]:
     """Assemble the complete, deterministic report document."""
     plan = bundle.plan
+    datasets = sorted(item.dataset_id for item in plan.datasets)
     return {
         "schema_version": REPORT_VERSION,
         "tool": {"name": "drillverify", "version": __version__},
         "run_id": bundle.run_id,
+        "comparability": {
+            "plan_dataset_scope": ",".join(datasets),
+            "rule_version": RULE_VERSION,
+            "analysis_window_days": plan.analysis_window_days,
+        },
         "generated_at": format_utc(plan.as_of),
         "as_of": format_utc(plan.as_of),
         "window_start": format_utc(plan.window_start),
@@ -180,3 +186,55 @@ def write_reports(bundle: RunBundle, out_dir: Path) -> dict[str, Path]:
         },
     )
     return outputs
+
+
+def render_trend_markdown(result: dict[str, Any]) -> str:
+    """Render the trend decision alongside its assumptions and sample."""
+    lines = [
+        "# DrillVerify Trend Audit",
+        "",
+        f"- Status: **{result['status'].upper()}**",
+        f"- Regime: `{result['mode']}`",
+        f"- Alpha: `{result['alpha']}`",
+        f"- Reason: {result['reason']}",
+    ]
+    sample = result.get("sample") or {}
+    if sample:
+        lines += ["", "## Comparable sample", "",
+                  f"- Runs: {', '.join(sample.get('comparable_run_ids', [])) or 'none'}",
+                  f"- Comparability: `{sample.get('comparability')}`",
+                  f"- Excluded: {sample.get('excluded') or 'none'}",
+                  f"- Duplicate run_ids: {sample.get('duplicates') or 'none'}"]
+    if result.get("strata"):
+        lines += ["", "## Exposure strata", "",
+                  "| Backups | Drills | Runs | Baseline | Recent |", "|---:|---:|---:|---|---|"]
+        for layer in result["strata"]:
+            lines.append(
+                f"| {layer['backup_count']} | {layer['drill_count']} | {layer['run_count']} | "
+                f"{', '.join(layer['baseline'])} | {', '.join(layer['recent'])} |")
+    if result.get("metrics"):
+        lines += ["", "## Metrics", "",
+                  "| Metric | Statistic | Single p | Family max | At least observed |",
+                  "|---|---:|---:|---|---:|"]
+        for item in result["metrics"]:
+            lines.append(
+                f"| `{item['metric']}` | {float(item['observed_statistic']['decimal']):.4f} | "
+                f"{item['p_exact']} | {item['is_family_max']} | "
+                f"{item['at_least_observed']}/{item['permutations']} |")
+    family = result.get("family")
+    if family:
+        lines += ["", "## Family-wise decision", "",
+                  f"- Observed maximum: {float(family['observed_max']['decimal']):.4f}",
+                  f"- Attained by: {', '.join(family['observed_metrics']) or 'none'}",
+                  f"- Permutations at least as extreme: {family['at_least_observed']}/"
+                  f"{family['permutations']}",
+                  f"- Family p: {family['p_exact']} "
+                  f"({float(family['p_value']):.6f})"]
+    permutation = result.get("permutation")
+    if permutation:
+        lines += ["", f"- Permutation budget: {permutation['budget']} "
+                      f"(enumerated {permutation['enumerated']})"]
+    lines += ["", "## Assumptions", ""]
+    lines += [f"- {item}" for item in result.get("assumptions", [])]
+    lines += ["", result.get("caveat", ""), ""]
+    return "\n".join(lines)

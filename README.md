@@ -16,6 +16,28 @@ make demo
 make serve
 ```
 
+## Audit trend
+
+The review console also exposes `/trend`, which answers a different question from a
+single run: across recent independent verifications, is a pre-registered anomaly rate
+actually higher than in the declared baseline? The rule is deliberately narrow:
+
+- One `run_id` is one observation. Repeated ledger writes stay in the audit trail but
+  count once, and a run's findings are one clustered yes/no per metric, never separate
+  accidents.
+- Runs are comparable only when plan dataset scope, rule version, analysis-window
+  convention and `backup_count`/`drill_count` exposure agree. Unmatched layers are
+  reported as unproven rather than compared.
+- The duty regime lets an on-call operator pre-select one metric and reads its
+  one-sided exact p. The overview regime permutes the maximum statistic over every
+  pre-registered metric, so nobody can pick the smallest raw p and apply a
+  single-metric threshold.
+- Exact enumeration is capped by a declared budget; exceeding it returns "unproven".
+
+A trend result is a decision aid with its sample and assumptions shown. A
+non-significant result is not evidence of recovery or compliance. Single-run backup
+chain, RPO/RTO and remediation conclusions are unchanged.
+
 `make demo` reads `fixtures/`, then writes:
 
 - `outputs/report.json`, `outputs/report.md`, `outputs/report.html`

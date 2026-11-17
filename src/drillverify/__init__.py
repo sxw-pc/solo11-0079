@@ -2,5 +2,6 @@
 
 __version__ = "1.0.0"
 REPORT_VERSION = "1"
+RULE_VERSION = "1"
 
-__all__ = ["__version__", "REPORT_VERSION"]
+__all__ = ["__version__", "REPORT_VERSION", "RULE_VERSION"]

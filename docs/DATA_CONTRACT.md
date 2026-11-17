@@ -110,3 +110,8 @@ Each finding contains `rule_id`, `severity`, `object_type`, `object_id`,
 `message`, `file`, `line`, `input_sha256` and structured evidence. Input files
 that are missing are traced to the catalog or drill-log SHA-256 that cited them;
 the absent file itself naturally has no fingerprint.
+
+The report also carries a `comparability` object with `plan_dataset_scope`
+(sorted dataset IDs), `rule_version` and `analysis_window_days`. The audit trend
+view uses these fields to reject comparisons across different plans or rule
+sets; they do not change any single-run conclusion.

@@ -187,24 +187,38 @@ def record_run(db_path: Path, bundle: RunBundle, report: dict[str, Any]) -> int:
         connection.close()
 
 
-def list_runs(db_path: Path) -> list[dict[str, Any]]:
+def list_run_records(db_path: Path) -> list[dict[str, Any]]:
+    """Return every immutable ledger row with its full report snapshot.
+
+    Repeated ``run_id`` rows stay in this audit view; the trend layer collapses
+    them to a single statistical observation.
+    """
     connection = _read_connection(db_path)
     try:
         rows = connection.execute(
-            "SELECT id, run_id, as_of, status, summary_json FROM runs ORDER BY id DESC"
+            "SELECT id, run_id, as_of, status, summary_json, report_json "
+            "FROM runs ORDER BY id ASC"
         ).fetchall()
         return [
             {
-                "id": row["id"],
-                "run_id": row["run_id"],
-                "as_of": row["as_of"],
-                "status": row["status"],
-                "summary": json.loads(row["summary_json"]),
+                "id": row["id"], "run_id": row["run_id"], "as_of": row["as_of"],
+                "status": row["status"], "summary": json.loads(row["summary_json"]),
+                "report": json.loads(row["report_json"]),
             }
             for row in rows
         ]
     finally:
         connection.close()
+
+
+def list_runs(db_path: Path) -> list[dict[str, Any]]:
+    rows = list_run_records(db_path)
+    rows.reverse()
+    return [
+        {"id": row["id"], "run_id": row["run_id"], "as_of": row["as_of"],
+         "status": row["status"], "summary": row["summary"]}
+        for row in rows
+    ]
 
 
 def get_run(db_path: Path, run_pk: int) -> dict[str, Any] | None:

@@ -1,0 +1,125 @@
+{% extends "layout.html" %}
+{% block title %}DrillVerify · Trend audit{% endblock %}
+{% block content %}
+<p class="muted">Run-clustered, exposure-matched audit trend</p>
+<h1>Audit trend</h1>
+<p class="lede">
+  Each distinct <code>run_id</code> is one observation; repeated ledger rows stay in the
+  audit trail but count once. A run is positive for a metric when it contains a
+  <em>material</em> finding (critical, high, error or medium) of that pre-registered
+  rule, severity or category. Findings are never treated as independent samples.
+  Only runs with the same plan dataset scope, rule version, analysis-window convention
+  and <code>backup_count</code>/<code>drill_count</code> exposure layer are compared.
+</p>
+
+<form method="get" action="{{ url_for('trend') }}">
+  <div class="panel">
+    <p><label>Regime
+      <select name="mode">
+        <option value="duty" {% if query.mode == 'duty' %}selected{% endif %}>duty (one metric)</option>
+        <option value="overview" {% if query.mode != 'duty' %}selected{% endif %}>overview (family max)</option>
+      </select></label></p>
+    <p><label>Pre-registered metrics (comma separated <code>rule:</code>, <code>severity:</code>, <code>category:</code>)
+      <input name="metrics" size="70" value="{{ query.metrics }}"></label></p>
+    <p><label>Baseline run_ids <input name="baseline" size="70" value="{{ query.baseline }}"></label></p>
+    <p><label>Recent run_ids <input name="recent" size="70" value="{{ query.recent }}"></label></p>
+    <p><label>Alpha <input name="alpha" size="8" value="{{ query.alpha }}"></label>
+       <label>Permutation budget <input name="budget" size="10" value="{{ query.budget }}"></label></p>
+    <button type="submit">Evaluate declared trend</button>
+  </div>
+</form>
+
+{% if not ledger_present %}
+<div class="empty">No ledger found yet. Run <code>make demo</code> to populate the audit trail.</div>
+{% elif not declared %}
+<div class="empty">Declare both windows and at least one metric before any outcome is evaluated.</div>
+{% else %}
+  <h2>Decision</h2>
+  <div class="panel">
+    <p>
+      <span class="status status-{{ 'fail' if result.alert else 'pass' }}">{{ result.status }}</span>
+      · regime <code>{{ result.mode }}</code>
+      {% if result.decision is defined %}
+      · decision p <code>{{ result.decision.p_exact }}</code> ({{ '%.6f' % result.decision.p_value }})
+      · alpha <code>{{ result.alpha }}</code>
+      · basis: {{ result.decision.basis }}
+      {% else %}
+      · no decision · {{ result.reason }}
+      {% endif %}
+    </p>
+    {% if not result.alert %}<p class="muted">Not significant is not evidence of recovery or compliance.</p>{% endif %}
+  </div>
+
+  <h2>Comparable sample</h2>
+  <div class="panel">
+    {% if result.sample %}
+    <dl class="detail-grid">
+      <dt>Comparable run_ids</dt><dd>{{ result.sample.comparable_run_ids|default([], true)|join(', ') or 'none' }}</dd>
+      <dt>Baseline</dt><dd>{{ result.sample.baseline_run_ids|default([], true)|join(', ') or 'none' }}</dd>
+      <dt>Recent</dt><dd>{{ result.sample.recent_run_ids|default([], true)|join(', ') or 'none' }}</dd>
+      <dt>Comparability</dt><dd>{% if result.sample.comparability %}<code>{{ result.sample.comparability }}</code>{% else %}unavailable{% endif %}</dd>
+      <dt>Excluded</dt><dd>{{ result.sample.excluded|default([], true) or 'none' }}</dd>
+      <dt>Duplicate run_ids</dt><dd>{{ result.sample.duplicates|default([], true) or 'none' }}</dd>
+    </dl>
+    {% else %}<p class="muted">{{ result.reason }}</p>{% endif %}
+  </div>
+
+  {% if result.strata %}
+  <h2>Exposure strata</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th class="numeric">Backups</th><th class="numeric">Drills</th><th class="numeric">Runs</th><th>Baseline</th><th>Recent</th></tr></thead>
+      <tbody>
+      {% for layer in result.strata %}
+        <tr><td class="numeric">{{ layer.backup_count }}</td><td class="numeric">{{ layer.drill_count }}</td>
+            <td class="numeric">{{ layer.run_count }}</td><td>{{ layer.baseline|join(', ') }}</td>
+            <td>{{ layer.recent|join(', ') }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if result.metrics %}
+  <h2>Metrics</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Metric</th><th class="numeric">Observed statistic</th><th class="numeric">Single p</th>
+                 <th>Family max</th><th class="numeric">At least observed</th></tr></thead>
+      <tbody>
+      {% for item in result.metrics %}
+        <tr><td><code>{{ item.metric }}</code></td>
+            <td class="numeric">{{ '%.4f' % item.observed_statistic.decimal }}</td>
+            <td class="numeric">{{ item.p_exact }}<br><span class="small muted">{{ '%.6f' % item.p_value }}</span></td>
+            <td>{{ item.is_family_max }}</td>
+            <td class="numeric">{{ item.at_least_observed }}/{{ item.permutations }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if result.family %}
+  <h2>Family-wise control</h2>
+  <div class="panel">
+    <p>Observed maximum {{ '%.4f' % result.family.observed_max.decimal }} attained by
+      {{ result.family.observed_metrics|join(', ') or 'none' }}.
+      {{ result.family.at_least_observed }}/{{ result.family.permutations }} permutations
+      reach it; family p = <code>{{ result.family.p_exact }}</code> ({{ '%.6f' % result.family.p_value }}).
+      The overview regime never selects the smallest raw p for a single-metric threshold.</p>
+  </div>
+  {% endif %}
+
+  <h2>Statistical assumptions and sample</h2>
+  <div class="panel">
+    <ul>{% for item in result.assumptions %}<li>{{ item }}</li>{% endfor %}</ul>
+    <p class="muted">{{ result.caveat }}</p>
+    {% if result.permutation %}
+    <p class="small muted">Permutation budget {{ result.permutation.budget }};
+      enumerated {{ result.permutation.enumerated }} of {{ result.permutation.total }}.</p>
+    {% endif %}
+  </div>
+{% endif %}
+
+<p class="small muted"><a href="{{ url_for('index') }}">Back to verification runs</a></p>
+{% endblock %}
