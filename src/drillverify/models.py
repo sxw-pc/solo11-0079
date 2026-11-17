@@ -69,6 +69,87 @@ class Finding:
 
 
 @dataclass(frozen=True)
+class ColumnDecl:
+    """One declared column of a versioned schema contract."""
+
+    name: str
+    type: str
+    required: bool
+    key_role: str = "none"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"name": self.name, "type": self.type, "required": self.required, "key_role": self.key_role}
+
+
+@dataclass(frozen=True)
+class SchemaContract:
+    """The declared shape of one schema version."""
+
+    version: str
+    columns: tuple[ColumnDecl, ...]
+
+    def column_map(self) -> dict[str, ColumnDecl]:
+        return {column.name: column for column in self.columns}
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"version": self.version, "columns": [item.to_dict() for item in self.columns]}
+
+
+@dataclass(frozen=True)
+class ColumnMap:
+    """One declarative source-to-target column mapping of a migration edge."""
+
+    source: str
+    target: str
+    transform: str
+    range_proof: str = "none"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"source": self.source, "target": self.target, "transform": self.transform, "range_proof": self.range_proof}
+
+
+@dataclass(frozen=True)
+class MigrationEdge:
+    """A declarative, code-free migration step between two schema versions."""
+
+    edge_id: str
+    from_version: str
+    to_version: str
+    column_maps: tuple[ColumnMap, ...] = ()
+    dropped_columns: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "edge_id": self.edge_id,
+            "from_version": self.from_version,
+            "to_version": self.to_version,
+            "column_maps": [item.to_dict() for item in self.column_maps],
+            "dropped_columns": list(self.dropped_columns),
+        }
+
+
+@dataclass(frozen=True)
+class SchemaMigrationConfig:
+    """The plan-declared restore target, purpose, contracts and edges."""
+
+    target_version: str
+    purpose: str
+    contracts: tuple[SchemaContract, ...]
+    edges: tuple[MigrationEdge, ...]
+
+    def contract_map(self) -> dict[str, SchemaContract]:
+        return {contract.version: contract for contract in self.contracts}
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "target_version": self.target_version,
+            "purpose": self.purpose,
+            "contracts": [item.to_dict() for item in self.contracts],
+            "edges": [item.to_dict() for item in self.edges],
+        }
+
+
+@dataclass(frozen=True)
 class DatasetConfig:
     dataset_id: str
     display_name: str
@@ -102,6 +183,7 @@ class RecoveryPlan:
     analysis_window_days: int
     datasets: tuple[DatasetConfig, ...]
     plan_path: str
+    schema_migration: SchemaMigrationConfig | None = None
 
     @property
     def window_start(self) -> datetime:
@@ -119,4 +201,5 @@ class RecoveryPlan:
             "window_start": format_utc(self.window_start),
             "datasets": [dataset.to_dict() for dataset in self.datasets],
             "plan_path": self.plan_path,
+            "schema_migration": self.schema_migration.to_dict() if self.schema_migration else None,
         }

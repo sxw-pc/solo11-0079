@@ -36,6 +36,7 @@ def build_report(bundle: RunBundle) -> dict[str, Any]:
         "backups": [item.to_dict() for item in bundle.backups],
         "chains": [item.to_dict() for item in bundle.chains],
         "restorable_points": [item.to_dict() for item in bundle.points],
+        "schema_proofs": [item.to_dict() for item in bundle.schema_proofs],
         "objectives": {
             "rpo": [item.to_dict() for item in bundle.rpo],
             "rto": [item.to_dict() for item in bundle.rto],

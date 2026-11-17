@@ -27,6 +27,7 @@ from .results import (
     RpoResult,
     RtoResult,
 )
+from .schema_compat import SchemaProofRecord
 from .timeutil import format_utc
 from .validators import validate_catalog, validate_drills
 
@@ -48,6 +49,7 @@ class RunBundle:
     evidence: tuple[EvidenceCheck, ...]
     chains: tuple[BackupChainResult, ...]
     points: tuple[RestorablePoint, ...]
+    schema_proofs: tuple[SchemaProofRecord, ...]
     drills: tuple[DrillSummary, ...]
     rpo: tuple[RpoResult, ...]
     rto: tuple[RtoResult, ...]
@@ -270,6 +272,7 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         evidence=evidence_assessment.checks,
         chains=chain_assessment.chains,
         points=chain_assessment.points,
+        schema_proofs=chain_assessment.schema_proofs,
         drills=drill_assessment.summaries,
         rpo=rpo,
         rto=rto,

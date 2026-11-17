@@ -52,12 +52,33 @@ silently dropped.
 | `CHAIN-002` | high | Incremental has no full-backup ancestry |
 | `CHAIN-003` | critical | Parent cycle |
 | `CHAIN-004` | high | Parent finishes after child starts |
-| `CHAIN-005` | high | Parent schema differs from child schema |
+| `CHAIN-005` | high | Parent schema differs from child schema and no declared migration edge proves it safe |
 | `CHAIN-006` | high | Backup start or finish is later than `as_of` |
 | `CHAIN-009` | high | An ancestor chain is not restorable |
+| `CHAIN-010` | high | Backup schema is not proven compatible with the plan's restore-target schema |
 
 A restorable point requires a structurally complete chain, a ready artifact and
-a ready artifact on every ancestor. Future rows are never restorable.
+a ready artifact on every ancestor. Future rows are never restorable. Without a
+`schema_migration` plan section, schema versions must be equal (legacy rule).
+With one, a static proof decides: version names may differ when a declared,
+fully proven migration path exists.
+
+## Schema compatibility — `SCHEMA-*`
+
+Static, offline proofs only: no migration is ever executed and no data is
+transformed. A proof combines column lineage, integer ranges, nullability and
+key uniqueness along every candidate edge path. Missing range evidence is
+reported as unproven, never as success.
+
+| Rule | Severity | Trigger |
+|---|---|---|
+| `SCHEMA-001` | high | Required target column has no proven lineage through an edge |
+| `SCHEMA-002` | high | Narrowing or key uniqueness evidence is missing (unproven) or contradicted |
+| `SCHEMA-003` | high | Two candidate paths assign conflicting meaning to one source column |
+| `SCHEMA-004` | high | Edge drops a column; the rollback purpose cannot reconstruct it |
+| `SCHEMA-005` | high | No declared contract for a version or no migration path (unproven) |
+| `SCHEMA-006` | high | Edge or contract is invalid (unknown column, bad transform, unaccounted column) |
+| `SCHEMA-007` | high | Optional (nullable) source column feeds a required target column |
 
 ## Artifact and evidence — `ART-*`, `EVID-*`
 

@@ -11,6 +11,7 @@ import yaml
 
 from .models import DatasetConfig, FileFingerprint, Finding, RecoveryPlan
 from .paths import UnsafePath, resolve_under, safe_relative, sha256_file
+from .schema_config import parse_schema_migration
 from .timeutil import TimestampError, parse_utc
 
 _ID_RE = re.compile(r"^[a-z][a-z0-9-]{2,63}$")
@@ -215,10 +216,19 @@ def load_plan(plan_path: Path, fixtures_root: Path) -> PlanLoad:
         issue("CFG-003", "No valid dataset declaration remains.", rel_path)
         return PlanLoad(None, tuple(findings), fingerprint)
 
+    schema_migration = None
+    if raw.get("schema_migration") is not None:
+        schema_migration, schema_errors = parse_schema_migration(raw["schema_migration"])
+        for message in schema_errors:
+            issue("CFG-001", f"schema_migration: {message}", rel_path)
+        if schema_errors:
+            return PlanLoad(None, tuple(sorted(findings, key=Finding.sort_key)), fingerprint)
+
     plan = RecoveryPlan(
         as_of=as_of,
         analysis_window_days=window,
         datasets=tuple(sorted(datasets, key=lambda item: item.dataset_id)),
         plan_path=rel_path,
+        schema_migration=schema_migration,
     )
     return PlanLoad(plan, tuple(sorted(findings, key=Finding.sort_key)), fingerprint)

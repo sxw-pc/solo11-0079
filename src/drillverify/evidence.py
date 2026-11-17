@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from .models import FileFingerprint, Finding, RecoveryPlan
 from .paths import UnsafePath, resolve_under, safe_relative, sha256_file
-from .records import ArtifactCheck, ArtifactManifest, BackupRecord, DrillEvent, EvidenceCheck
+from .records import ArtifactCheck, ArtifactManifest, BackupRecord, DrillEvent, EvidenceCheck, parse_column_ranges
 _SHA_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 @dataclass(frozen=True)
 class ArtifactAssessment:
@@ -208,12 +208,16 @@ def _parse_manifest(raw: object, rel_path: str) -> ArtifactManifest | None:
         return None
     if not isinstance(schema_version, str) or not schema_version:
         return None
+    column_ranges = parse_column_ranges(raw.get("column_ranges"))
+    if column_ranges is None:
+        return None
     return ArtifactManifest(
         backup_id=backup_id,
         row_count=row_count,
         data_sha256=digest.lower(),
         schema_version=schema_version,
         path=rel_path,
+        column_ranges=column_ranges,
     )
 def assess_evidence(
     events: tuple[DrillEvent, ...],

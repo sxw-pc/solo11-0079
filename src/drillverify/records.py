@@ -76,12 +76,46 @@ class DrillEvent:
 
 
 @dataclass(frozen=True)
+class ColumnRange:
+    column: str
+    minimum: int
+    maximum: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"column": self.column, "minimum": self.minimum, "maximum": self.maximum}
+
+
+def parse_column_ranges(raw: object) -> tuple[ColumnRange, ...] | None:
+    """Parse optional manifest column ranges; None means malformed."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, dict):
+        return None
+    parsed: list[ColumnRange] = []
+    for name in sorted(raw):
+        bounds = raw[name]
+        if not isinstance(name, str) or not name or not isinstance(bounds, dict):
+            return None
+        low, high = bounds.get("min"), bounds.get("max")
+        if isinstance(low, bool) or isinstance(high, bool):
+            return None
+        if not isinstance(low, int) or not isinstance(high, int) or low > high:
+            return None
+        parsed.append(ColumnRange(name, low, high))
+    return tuple(parsed)
+
+
+@dataclass(frozen=True)
 class ArtifactManifest:
     backup_id: str
     row_count: int
     data_sha256: str
     schema_version: str
     path: str
+    column_ranges: tuple[ColumnRange, ...] = ()
+
+    def range_map(self) -> dict[str, tuple[int, int]]:
+        return {item.column: (item.minimum, item.maximum) for item in self.column_ranges}
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -90,6 +124,7 @@ class ArtifactManifest:
             "data_sha256": self.data_sha256,
             "schema_version": self.schema_version,
             "path": self.path,
+            "column_ranges": [item.to_dict() for item in self.column_ranges],
         }
 
 

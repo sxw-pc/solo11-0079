@@ -57,7 +57,10 @@ An incremental backup is structurally restorable only when:
 - its parent exists in the same dataset;
 - the parent chain reaches a full backup without a cycle;
 - parent finish time is not after child start time;
-- parent and child schema versions agree;
+- parent and child schema versions agree, or — when the plan declares a
+  `schema_migration` section — a static proof shows the parent schema can
+  migrate to the child schema and every backup schema can migrate to the
+  declared restore-target version for the declared purpose;
 - every member is at or before `as_of`;
 - every artifact and per-backup manifest in the ancestry is ready.
 
