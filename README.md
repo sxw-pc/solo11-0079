@@ -50,8 +50,9 @@ There are no write, execute, rerun, delete or downstream-dispatch endpoints.
 4. Rebuild full/incremental chains and select restorable points.
 5. Evaluate RPO gaps and drill wall-clock RTO.
 6. Check required steps, evidence, row counts and checksums.
-7. Attribute failures to stable categories and generate owner-assigned actions.
-8. Write reports, a self-contained HTML artifact and an append-only SQLite ledger.
+7. Prove cross-dataset settled-transaction consistency for declared cohorts.
+8. Attribute failures to stable categories and generate owner-assigned actions.
+9. Write reports, a self-contained HTML artifact and an append-only SQLite ledger.
 
 ## Determinism and traceability
 

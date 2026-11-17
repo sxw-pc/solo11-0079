@@ -71,6 +71,68 @@ reported later with rule IDs.
 expected restored-data checksum reported by drills. It is distinct from the
 catalog `sha256`, which fingerprints the stored artifact file.
 
+### Optional transaction summary — `transaction_summary`
+
+A manifest may carry a small synthetic summary bundle used only by cohort
+verification:
+
+```json
+{
+  "transaction_summary": {
+    "rows": [
+      {
+        "part_id": "p-ord-1",
+        "tx_ref_masked": "tx-**-**",
+        "amount": 70,
+        "role": "order",
+        "source_fingerprint": "<64 lowercase hex>"
+      }
+    ]
+  }
+}
+```
+
+Each row is one contribution: a stable `part_id` (unique across the cohort;
+split parts of one logical record each get their own), a masked transaction
+reference (`*` hides characters), a non-negative integer amount, a role of
+`order`, `event`, `debit` or `credit`, and the fingerprint of the extract the
+row was derived from. The source dataset/backup is the manifest that holds the
+row. A malformed section raises `ART-007` and disables cohort evaluation for
+that member; an absent section is not an error by itself.
+
+## Transaction cohorts — `fixtures/plans/transaction_cohorts.yaml` (optional)
+
+```yaml
+schema_version: 1
+cohorts:
+  - cohort_id: cohort-close-1109
+    purpose: strict_publish        # or triage_review
+    members:
+      - dataset_id: ds-orders
+        backup_id: bk-orders-042
+        expected_manifest_sha256: "<optional 64 hex pin>"
+      - dataset_id: ds-ledger
+        backup_id: bk-ledger-002
+    required_roles: [order, event, debit, credit]
+    anchor_roles: [debit, credit]
+    role_sources:
+      order: [ds-orders]
+      event: [ds-events]
+      debit: [ds-ledger]
+      credit: [ds-ledger]
+    search_budget: 100000          # optional, bounded
+```
+
+Members must be existing restorable points spanning at least two datasets; no
+restore is executed and no closest cut is searched. Contributions attribute
+only to anchors (distinct masked references among `anchor_roles` rows) that
+refine their mask, each contribution is used at most once, and every used
+transaction must close `required_roles`. The checker enumerates the bounded
+integer domain exhaustively within `search_budget` and reports the exact
+minimum and maximum net gap with complete matching witnesses. The verdict is
+independent of per-dataset RPO and drill RTO and never uses the report clock
+as transaction evidence.
+
 ## Drill log — `fixtures/logs/restore_drill.jsonl`
 
 One JSON object per line. Required keys:

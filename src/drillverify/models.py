@@ -97,6 +97,43 @@ class DatasetConfig:
 
 
 @dataclass(frozen=True)
+class CohortMemberSpec:
+    """One plan-declared cohort member: an existing restorable point."""
+
+    dataset_id: str
+    backup_id: str
+    expected_manifest_sha256: str | None
+
+
+@dataclass(frozen=True)
+class RoleContract:
+    """Which roles a settled transaction must close and who may supply them."""
+
+    required_roles: tuple[str, ...]
+    anchor_roles: tuple[str, ...]
+    role_sources: dict[str, tuple[str, ...]]
+
+
+@dataclass(frozen=True)
+class CohortSpec:
+    """A plan-declared cohort of restorable points under one role contract."""
+
+    cohort_id: str
+    purpose: str
+    members: tuple[CohortMemberSpec, ...]
+    role_contract: RoleContract
+    search_budget: int
+
+
+@dataclass(frozen=True)
+class CohortSpecLoad:
+    specs: tuple[CohortSpec, ...]
+    findings: tuple[Finding, ...]
+    fingerprint: FileFingerprint | None
+    path: str
+
+
+@dataclass(frozen=True)
 class RecoveryPlan:
     as_of: datetime
     analysis_window_days: int

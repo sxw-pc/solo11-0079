@@ -107,11 +107,30 @@ the last point to `as_of`. A gap exactly equal to the objective passes. RTO uses
 all attempts, including retries; an unsuccessful drill is `not_met` even when
 its duration is below target.
 
+## Transaction cohorts — `TXN-*`
+
+| Rule | Severity | Trigger |
+|---|---|---|
+| `TXN-001` | error | Cohort spec file or entry is malformed or violates the contract schema |
+| `TXN-002` | high | Cohort member is unknown or is not a restorable point |
+| `TXN-003` | high | Member manifest fingerprint differs from the pinned value |
+| `TXN-004` | high | Member manifest lacks a usable transaction summary |
+| `TXN-005` | high | No legal attribution closes every transaction |
+| `TXN-006` | high | Every legal attribution is unbalanced (proven conflict) |
+| `TXN-007` | medium | Some legal attributions conserve and some do not (unproven) |
+| `TXN-008` | medium | Search budget exhausted before the proof completed |
+
+A cohort verdict is `proven_consistent` only when every legal attribution
+conserves, `proven_conflict` only when none does, `pending_review` when
+interpretations disagree, and `inconclusive` with a locatable cause otherwise.
+`ART-007` (high) marks a malformed summary section inside one artifact manifest.
+
 ## Attribution and remediation
 
 Each finding maps to one category: `configuration`, `input_quality`,
 `chain_integrity`, `artifact_integrity`, `evidence_integrity`,
-`data_consistency`, `recoverability`, `rpo_gap`, `rto_gap` or `general`.
+`data_consistency`, `recoverability`, `rpo_gap`, `rto_gap`,
+`transaction_consistency` or `general`.
 
 Material findings (`critical`, `high`, `error`, `medium`) are grouped by category,
 owner, dataset and object. Each action receives a stable content-derived ID, SLA

@@ -106,6 +106,112 @@ class RtoResult:
 
 
 @dataclass(frozen=True)
+class AssignmentWitness:
+    """One complete legal attribution with its net-gap certificate."""
+
+    assignments: tuple[tuple[str, str], ...]
+    total_gap: int
+    transaction_gaps: tuple[tuple[str, int], ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "assignments": [
+                {"part_id": part, "anchor": anchor} for part, anchor in self.assignments
+            ],
+            "total_gap": self.total_gap,
+            "transaction_gaps": [
+                {"anchor": anchor, "gap": gap} for anchor, gap in self.transaction_gaps
+            ],
+        }
+
+
+@dataclass(frozen=True)
+class CohortProof:
+    """Exact min/max net gap over every legal attribution of a cohort."""
+
+    status: str
+    cause: str
+    contribution_count: int
+    transaction_count: int
+    nodes_explored: int
+    assignments_evaluated: int
+    budget: int
+    min_gap: int | None
+    max_gap: int | None
+    min_witness: AssignmentWitness | None
+    max_witness: AssignmentWitness | None
+    conserving_witnesses: tuple[AssignmentWitness, ...]
+    unassigned_part_ids: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "cause": self.cause,
+            "contribution_count": self.contribution_count,
+            "transaction_count": self.transaction_count,
+            "nodes_explored": self.nodes_explored,
+            "assignments_evaluated": self.assignments_evaluated,
+            "budget": self.budget,
+            "min_gap": self.min_gap,
+            "max_gap": self.max_gap,
+            "min_witness": self.min_witness.to_dict() if self.min_witness else None,
+            "max_witness": self.max_witness.to_dict() if self.max_witness else None,
+            "conserving_witnesses": [item.to_dict() for item in self.conserving_witnesses],
+            "unassigned_part_ids": list(self.unassigned_part_ids),
+        }
+
+
+@dataclass(frozen=True)
+class CohortMemberResult:
+    dataset_id: str
+    backup_id: str
+    finished_at: str
+    manifest_sha256: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "dataset_id": self.dataset_id,
+            "backup_id": self.backup_id,
+            "finished_at": self.finished_at,
+            "manifest_sha256": self.manifest_sha256,
+        }
+
+
+@dataclass(frozen=True)
+class CohortResult:
+    """Verdict for one cohort, grounded only in its transaction summaries."""
+
+    cohort_id: str
+    purpose: str
+    status: str
+    cause: str
+    members: tuple[CohortMemberResult, ...]
+    contribution_count: int
+    proof: CohortProof | None
+    publish_gate: str
+    manual_verification_required: bool
+    evidence_basis: str
+    evidence_window_end: str
+    detail: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "cohort_id": self.cohort_id,
+            "purpose": self.purpose,
+            "status": self.status,
+            "cause": self.cause,
+            "detail": self.detail,
+            "members": [item.to_dict() for item in self.members],
+            "contribution_count": self.contribution_count,
+            "publish_gate": self.publish_gate,
+            "manual_verification_required": self.manual_verification_required,
+            "evidence_basis": self.evidence_basis,
+            "evidence_window_end": self.evidence_window_end,
+            "proof": self.proof.to_dict() if self.proof else None,
+        }
+
+
+@dataclass(frozen=True)
 class DrillSummary:
     drill_id: str
     dataset_id: str

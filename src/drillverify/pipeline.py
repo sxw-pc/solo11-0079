@@ -12,7 +12,7 @@ from .actions import AttributionRecord, PlanAction
 from .attribution import attribute
 from .backup_chain import ChainAssessment, assess_chains
 from .config import load_plan
-from .consistency import DrillAssessment, assess_drills
+from .consistency import CohortAssessment, DrillAssessment, assess_drills, assess_transaction_cohorts
 from .evidence import ArtifactAssessment, EvidenceAssessment, assess_artifacts, assess_evidence
 from .loaders import load_catalog, load_drills
 from .models import FileFingerprint, Finding, RecoveryPlan
@@ -22,6 +22,7 @@ from .planner import build_plan
 from .records import ArtifactCheck, BackupRecord, DrillEvent, EvidenceCheck
 from .results import (
     BackupChainResult,
+    CohortResult,
     DrillSummary,
     RestorablePoint,
     RpoResult,
@@ -51,6 +52,7 @@ class RunBundle:
     drills: tuple[DrillSummary, ...]
     rpo: tuple[RpoResult, ...]
     rto: tuple[RtoResult, ...]
+    cohorts: tuple[CohortResult, ...]
     attribution: tuple[AttributionRecord, ...]
     attribution_summary: dict[str, Any]
     actions: tuple[PlanAction, ...]
@@ -201,6 +203,10 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         drill_hash,
     )
     objective_assessment = ObjectiveAssessment(rpo, rto, rpo_findings + rto_findings)
+    cohort_assessment: CohortAssessment = assess_transaction_cohorts(
+        plan, chain_assessment.points, artifact_assessment.manifests,
+        artifact_assessment.manifest_fingerprints, catalog.records, root,
+    )
 
     all_findings = list(plan_load.findings)
     all_findings.extend(catalog.findings)
@@ -210,18 +216,17 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
     all_findings.extend(chain_assessment.findings)
     all_findings.extend(drill_assessment.findings)
     all_findings.extend(objective_assessment.findings)
+    all_findings.extend(cohort_assessment.findings)
     findings = _dedupe_findings(all_findings, catalog_hash, drill_hash)
     records, attribution_summary = attribute(findings)
     actions, plan_summary = build_plan(plan, findings, catalog.records, drills.events)
 
     fingerprints: dict[str, FileFingerprint] = {}
-    for fingerprint in (
-        ([plan_load.fingerprint] if plan_load.fingerprint else [])
-        + ([catalog_load.fingerprint] if catalog_load.fingerprint else [])
-        + ([drill_load.fingerprint] if drill_load.fingerprint else [])
-        + list(artifact_assessment.files)
-        + list(evidence_assessment.files)
-    ):
+    optional = [plan_load.fingerprint, catalog_load.fingerprint, drill_load.fingerprint,
+                cohort_assessment.spec_fingerprint]
+    seen_files = [item for item in optional if item]
+    seen_files += list(artifact_assessment.files) + list(evidence_assessment.files)
+    for fingerprint in seen_files:
         fingerprints[fingerprint.path] = fingerprint
     inputs = tuple(sorted(fingerprints.values(), key=lambda item: item.path))
     run_seed = {
@@ -262,6 +267,12 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         "input_file_count": len(inputs),
         "validation_rejected_rows": catalog.rejected_count + drills.rejected_count,
     }
+    if cohort_assessment.results:
+        by_status = Counter(item.status for item in cohort_assessment.results)
+        summary["transaction_cohorts"] = {
+            "count": len(cohort_assessment.results),
+            "by_status": {key: by_status[key] for key in sorted(by_status)},
+        }
     return RunBundle(
         run_id=run_id,
         plan=plan,
@@ -273,6 +284,7 @@ def run_pipeline(fixtures_root: Path) -> RunBundle:
         drills=drill_assessment.summaries,
         rpo=rpo,
         rto=rto,
+        cohorts=cohort_assessment.results,
         attribution=records,
         attribution_summary=attribution_summary,
         actions=actions,

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from .models import Finding, RecoveryPlan
+from .models import FileFingerprint, Finding, RecoveryPlan
 from .records import ArtifactManifest, BackupRecord, DrillEvent
-from .results import BackupChainResult, DrillSummary
+from .results import BackupChainResult, CohortResult, DrillSummary, RestorablePoint
+from .transaction_cohort import evaluate_cohort, load_cohort_specs
 
 
 @dataclass(frozen=True)
@@ -15,6 +17,14 @@ class DrillAssessment:
     summaries: tuple[DrillSummary, ...]
     findings: tuple[Finding, ...]
     success: dict[str, bool]
+
+
+@dataclass(frozen=True)
+class CohortAssessment:
+    results: tuple[CohortResult, ...]
+    findings: tuple[Finding, ...]
+    spec_fingerprint: FileFingerprint | None
+    spec_path: str
 
 
 def _effective(events: list[DrillEvent]) -> dict[str, DrillEvent]:
@@ -77,87 +87,36 @@ def assess_drills(
         consistency_ok = True
 
         if missing:
-            findings.append(
-                _finding(
-                    "EVID-004",
-                    "high",
-                    drill_id,
-                    "Required drill steps are missing.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    missing_steps=missing,
-                    required_steps=list(dataset.required_steps),
-                )
-            )
+            findings.append(_finding(
+                "EVID-004", "high", drill_id, "Required drill steps are missing.",
+                drill_path, first_line, drill_hash,
+                missing_steps=missing, required_steps=list(dataset.required_steps)))
         if failed:
-            findings.append(
-                _finding(
-                    "EVID-005",
-                    "high",
-                    drill_id,
-                    "Required drill steps failed.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    failed_steps=failed,
-                )
-            )
+            findings.append(_finding(
+                "EVID-005", "high", drill_id, "Required drill steps failed.",
+                drill_path, first_line, drill_hash, failed_steps=failed))
         if skipped:
-            findings.append(
-                _finding(
-                    "EVID-006",
-                    "medium",
-                    drill_id,
-                    "Required drill steps were skipped.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    skipped_steps=skipped,
-                )
-            )
+            findings.append(_finding(
+                "EVID-006", "medium", drill_id, "Required drill steps were skipped.",
+                drill_path, first_line, drill_hash, skipped_steps=skipped))
         retries = sorted(step for step in {event.step for event in drill_events} if sum(
             1 for event in drill_events if event.step == step
         ) > 1)
         if retries:
-            findings.append(
-                _finding(
-                    "EVID-007",
-                    "warning",
-                    drill_id,
-                    "Drill retried one or more steps; wall-clock RTO includes retries.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    retried_steps=retries,
-                )
-            )
+            findings.append(_finding(
+                "EVID-007", "warning", drill_id,
+                "Drill retried one or more steps; wall-clock RTO includes retries.",
+                drill_path, first_line, drill_hash, retried_steps=retries))
         if unexpected:
-            findings.append(
-                _finding(
-                    "EVID-008",
-                    "info",
-                    drill_id,
-                    "Drill contains steps outside the required procedure.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    unexpected_steps=unexpected,
-                )
-            )
+            findings.append(_finding(
+                "EVID-008", "info", drill_id,
+                "Drill contains steps outside the required procedure.",
+                drill_path, first_line, drill_hash, unexpected_steps=unexpected))
         if not backup_ready:
-            findings.append(
-                _finding(
-                    "EVID-009",
-                    "high",
-                    drill_id,
-                    "Drill references a backup that is not a restorable point.",
-                    drill_path,
-                    first_line,
-                    drill_hash,
-                    backup_id=backup.backup_id,
-                )
-            )
+            findings.append(_finding(
+                "EVID-009", "high", drill_id,
+                "Drill references a backup that is not a restorable point.",
+                drill_path, first_line, drill_hash, backup_id=backup.backup_id))
 
         manifest = manifests.get(backup.backup_id)
         expected_rows = manifest.row_count if manifest else backup.row_count
@@ -166,67 +125,35 @@ def assess_drills(
         sha_event = effective.get("verify_checksum")
         if row_event and row_event.rows_restored is not None and row_event.rows_restored != expected_rows:
             consistency_ok = False
-            findings.append(
-                _finding(
-                    "CONS-001",
-                    "high",
-                    drill_id,
-                    "Restored row count does not match the artifact manifest.",
-                    drill_path,
-                    row_event.line_no,
-                    drill_hash,
-                    backup_id=backup.backup_id,
-                    expected=expected_rows,
-                    actual=row_event.rows_restored,
-                )
-            )
+            findings.append(_finding(
+                "CONS-001", "high", drill_id,
+                "Restored row count does not match the artifact manifest.",
+                drill_path, row_event.line_no, drill_hash,
+                backup_id=backup.backup_id, expected=expected_rows, actual=row_event.rows_restored))
         if sha_event and sha_event.reported_sha256 is not None and expected_sha is not None:
             if sha_event.reported_sha256 != expected_sha:
                 consistency_ok = False
-                findings.append(
-                    _finding(
-                        "CONS-002",
-                        "high",
-                        drill_id,
-                        "Restored checksum does not match the artifact manifest.",
-                        drill_path,
-                        sha_event.line_no,
-                        drill_hash,
-                        backup_id=backup.backup_id,
-                        expected=expected_sha,
-                        actual=sha_event.reported_sha256,
-                    )
-                )
+                findings.append(_finding(
+                    "CONS-002", "high", drill_id,
+                    "Restored checksum does not match the artifact manifest.",
+                    drill_path, sha_event.line_no, drill_hash,
+                    backup_id=backup.backup_id, expected=expected_sha, actual=sha_event.reported_sha256))
         if dataset.rowcount_required and not (
             row_event and row_event.rows_restored is not None and row_event.status == "success"
         ):
             consistency_ok = False
-            findings.append(
-                _finding(
-                    "CONS-003",
-                    "medium",
-                    drill_id,
-                    "A required row-count verification value is unavailable.",
-                    drill_path,
-                    row_event.line_no if row_event else first_line,
-                    drill_hash,
-                )
-            )
+            findings.append(_finding(
+                "CONS-003", "medium", drill_id,
+                "A required row-count verification value is unavailable.",
+                drill_path, row_event.line_no if row_event else first_line, drill_hash))
         if dataset.checksum_required and not (
             sha_event and sha_event.reported_sha256 is not None and sha_event.status == "success"
         ):
             consistency_ok = False
-            findings.append(
-                _finding(
-                    "CONS-004",
-                    "medium",
-                    drill_id,
-                    "A required checksum verification value is unavailable.",
-                    drill_path,
-                    sha_event.line_no if sha_event else first_line,
-                    drill_hash,
-                )
-            )
+            findings.append(_finding(
+                "CONS-004", "medium", drill_id,
+                "A required checksum verification value is unavailable.",
+                drill_path, sha_event.line_no if sha_event else first_line, drill_hash))
 
         drill_ok = (
             not missing
@@ -256,4 +183,74 @@ def assess_drills(
         tuple(sorted(summaries, key=lambda item: item.drill_id)),
         tuple(sorted(findings, key=Finding.sort_key)),
         success,
+    )
+
+
+_INCONCLUSIVE_RULES = {
+    "missing_member": ("TXN-002", "high", "Cohort member is not declared in the catalog."),
+    "member_not_restorable": ("TXN-002", "high", "Cohort member is not a restorable point."),
+    "fingerprint_mismatch": ("TXN-003", "high", "Cohort member manifest fingerprint differs from the pinned value."),
+    "missing_summary": ("TXN-004", "high", "Cohort member manifest lacks a transaction summary."),
+    "invalid_summary": ("TXN-004", "high", "Cohort member transaction summary is unusable."),
+    "no_legal_assignment": ("TXN-005", "high", "No legal transaction attribution closes the cohort."),
+    "budget_exceeded": ("TXN-008", "medium", "Search budget exhausted before the attribution proof completed."),
+}
+
+
+def _cohort_findings(result: CohortResult, spec_path: str, spec_hash: str) -> tuple[Finding, ...]:
+    """Translate one cohort verdict into a locatable finding, when any."""
+    proof = result.proof
+    evidence: dict[str, Any] = {
+        "purpose": result.purpose,
+        "publish_gate": result.publish_gate,
+        "evidence_basis": result.evidence_basis,
+        "evidence_window_end": result.evidence_window_end or None,
+        "detail": result.detail or None,
+        "contribution_count": proof.contribution_count if proof else None,
+        "assignments_evaluated": proof.assignments_evaluated if proof else None,
+        "min_gap": proof.min_gap if proof else None,
+        "max_gap": proof.max_gap if proof else None,
+    }
+    evidence = {key: value for key, value in evidence.items() if value is not None}
+    if proof and proof.unassigned_part_ids:
+        evidence["unassigned_part_ids"] = list(proof.unassigned_part_ids)
+    if result.status == "inconclusive":
+        rule, severity, message = _INCONCLUSIVE_RULES[result.cause]
+    elif result.status == "proven_conflict":
+        rule, severity, message = "TXN-006", "high", "Every legal transaction attribution is unbalanced."
+    elif result.status == "pending_review":
+        rule, severity = "TXN-007", "medium"
+        message = (
+            "Attributions disagree about conservation; strict publish is paused."
+            if result.purpose == "strict_publish"
+            else "Attributions disagree about conservation; cohort stays unproven for review."
+        )
+    else:
+        return ()
+    return (Finding(rule, severity, "cohort", result.cohort_id, message, spec_path, 0,
+                    evidence, spec_hash),)
+
+
+def assess_transaction_cohorts(
+    plan: RecoveryPlan,
+    points: tuple[RestorablePoint, ...],
+    manifests: dict[str, ArtifactManifest],
+    manifest_fingerprints: dict[str, str],
+    backups: tuple[BackupRecord, ...],
+    fixtures_root: Path,
+) -> CohortAssessment:
+    """Verify plan-declared cohorts of restorable points for settled-batch consistency."""
+    load = load_cohort_specs(fixtures_root, plan)
+    findings: list[Finding] = list(load.findings)
+    results: list[CohortResult] = []
+    spec_hash = load.fingerprint.sha256 if load.fingerprint else ""
+    for spec in load.specs:
+        result = evaluate_cohort(spec, points, manifests, manifest_fingerprints, backups)
+        results.append(result)
+        findings.extend(_cohort_findings(result, load.path, spec_hash))
+    return CohortAssessment(
+        tuple(sorted(results, key=lambda item: item.cohort_id)),
+        tuple(sorted(findings, key=Finding.sort_key)),
+        load.fingerprint,
+        load.path,
     )

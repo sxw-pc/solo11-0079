@@ -4,12 +4,54 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .models import FileFingerprint, Finding
 from .paths import UnsafePath, resolve_under, safe_relative, sha256_file
+from .records import TRANSACTION_ROLES, TransactionContribution
+
+MAX_CONTRIBUTION_AMOUNT = 9_999_999_999_999
+_MASK_RE = re.compile(r"^[A-Za-z0-9*][A-Za-z0-9*-]{0,63}$")
+_PART_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
+_SHA_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+def parse_transaction_summary(
+    section: object, dataset_id: str, backup_id: str, rel_path: str
+) -> tuple[tuple[TransactionContribution, ...] | None, str]:
+    """Read an optional manifest summary bundle; an absent section is not an error."""
+    if section is None:
+        return None, ""
+    rows = section.get("rows") if isinstance(section, dict) else None
+    if not isinstance(rows, list):
+        return None, "transaction_summary.rows must be a list"
+    contributions: list[TransactionContribution] = []
+    for index, row in enumerate(rows):
+        label = f"transaction_summary.rows[{index}]"
+        if not isinstance(row, dict):
+            return None, f"{label} must be an object"
+        part_id, masked, role = row.get("part_id"), row.get("tx_ref_masked"), row.get("role")
+        amount, fingerprint = row.get("amount"), row.get("source_fingerprint")
+        if not isinstance(part_id, str) or not _PART_RE.fullmatch(part_id):
+            return None, f"{label}.part_id is invalid"
+        if not isinstance(masked, str) or not _MASK_RE.fullmatch(masked):
+            return None, f"{label}.tx_ref_masked is invalid"
+        if isinstance(amount, bool) or not isinstance(amount, int) or not 0 <= amount <= MAX_CONTRIBUTION_AMOUNT:
+            return None, f"{label}.amount must be an integer from 0 to {MAX_CONTRIBUTION_AMOUNT}"
+        if role not in TRANSACTION_ROLES:
+            return None, f"{label}.role must be one of {', '.join(TRANSACTION_ROLES)}"
+        if not isinstance(fingerprint, str) or not _SHA_RE.fullmatch(fingerprint):
+            return None, f"{label}.source_fingerprint must be 64 hex characters"
+        contributions.append(
+            TransactionContribution(
+                dataset_id, backup_id, part_id, masked, amount,
+                role, fingerprint.lower(), rel_path,
+            )
+        )
+    return tuple(contributions), ""
 
 CATALOG_COLUMNS = (
     "dataset_id",

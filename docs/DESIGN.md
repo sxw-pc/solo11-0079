@@ -23,7 +23,8 @@ cleanup or remote operation.
 | `evidence.py` | Artifact, manifest and evidence-file integrity |
 | `backup_chain.py` | Full/incremental chain reconstruction and points |
 | `objectives.py` | RPO gap and wall-clock RTO evaluation |
-| `consistency.py` | Required step coverage, retries, row/hash reconciliation |
+| `consistency.py` | Required step coverage, retries, row/hash reconciliation, cohorts |
+| `transaction_cohort.py` | Cohort spec loading and bounded attribution proof |
 | `attribution.py` | Stable failure categories and probes |
 | `planner.py` | Deterministic owner-assigned remediation actions |
 | `reporting.py` | JSON, Markdown and self-contained HTML output |
@@ -41,6 +42,7 @@ Files are kept below 300 lines. Domain types are split among `models.py`,
 plan -> loaders -> validators -> artifacts/evidence
      -> chains/restorable points
      -> drill checks + RPO/RTO
+     -> transaction cohort proof
      -> findings + attribution
      -> remediation plan
      -> report writers + ledger
@@ -81,6 +83,22 @@ RTO:
 - use the earliest start and latest finish across every attempt;
 - compare whole elapsed minutes with the dataset target;
 - mark unsuccessful drills `not_met`; mark duration excess as `breach`.
+
+## Transaction cohort semantics
+
+An optional plan-declared cohort fixes a set of existing restorable points and
+a transaction role contract. The proof never executes a restore and never
+searches for the closest cut: it reads the optional `transaction_summary`
+bundles embedded in the members' artifact manifests and enumerates one bounded
+integer feasibility domain. A contribution attributes only to an anchor (a
+distinct masked reference among anchor-role rows) that refines its mask; each
+contribution is used at most once; every used transaction must close the
+required roles. The net gap of a transaction is the spread of its role totals.
+The exact minimum and maximum cohort gap decide the verdict: all-conserving is
+`proven_consistent`, all-conflicting is `proven_conflict`, mixed is
+`pending_review` (strict publish pauses; triage lists conserving candidates
+but stays unproven), and anything unevaluable is `inconclusive` with a
+locatable cause. The verdict is independent of RPO/RTO and the report clock.
 
 ## Determinism strategy
 

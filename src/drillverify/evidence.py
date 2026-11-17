@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from .loaders import parse_transaction_summary
 from .models import FileFingerprint, Finding, RecoveryPlan
 from .paths import UnsafePath, resolve_under, safe_relative, sha256_file
 from .records import ArtifactCheck, ArtifactManifest, BackupRecord, DrillEvent, EvidenceCheck
@@ -13,6 +14,7 @@ _SHA_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 class ArtifactAssessment:
     checks: tuple[ArtifactCheck, ...]
     manifests: dict[str, ArtifactManifest]
+    manifest_fingerprints: dict[str, str]
     findings: tuple[Finding, ...]
     files: tuple[FileFingerprint, ...]
 @dataclass(frozen=True)
@@ -56,6 +58,7 @@ def assess_artifacts(
     datasets = plan.dataset_map()
     checks: list[ArtifactCheck] = []
     manifests: dict[str, ArtifactManifest] = {}
+    manifest_fingerprints: dict[str, str] = {}
     findings: list[Finding] = []
     files: list[FileFingerprint] = []
     for backup in sorted(backups, key=lambda item: (item.dataset_id, item.backup_id)):
@@ -70,45 +73,24 @@ def assess_artifacts(
         artifact_file_hash = ""
         if not artifact_abs.is_file():
             failure_rules.append("ART-003")
-            findings.append(
-                _artifact_finding(
-                    "ART-003", "high", backup, "Artifact file is missing.", artifact_path, catalog_hash
-                )
-            )
+            findings.append(_artifact_finding(
+                "ART-003", "high", backup, "Artifact file is missing.", artifact_path, catalog_hash))
         else:
             artifact_file_hash = sha256_file(artifact_abs)
             size = artifact_abs.stat().st_size
-            files.append(
-                FileFingerprint(artifact_path, artifact_file_hash, size)
-            )
+            files.append(FileFingerprint(artifact_path, artifact_file_hash, size))
             if size != backup.artifact_size_bytes:
                 failure_rules.append("ART-004")
-                findings.append(
-                    _artifact_finding(
-                        "ART-004",
-                        "high",
-                        backup,
-                        "Artifact size does not match the catalog.",
-                        artifact_path,
-                        artifact_file_hash,
-                        expected=backup.artifact_size_bytes,
-                        actual=size,
-                    )
-                )
+                findings.append(_artifact_finding(
+                    "ART-004", "high", backup, "Artifact size does not match the catalog.",
+                    artifact_path, artifact_file_hash,
+                    expected=backup.artifact_size_bytes, actual=size))
             if artifact_file_hash != backup.sha256:
                 failure_rules.append("ART-005")
-                findings.append(
-                    _artifact_finding(
-                        "ART-005",
-                        "critical",
-                        backup,
-                        "Artifact SHA-256 does not match the catalog.",
-                        artifact_path,
-                        artifact_file_hash,
-                        expected=backup.sha256,
-                        actual=artifact_file_hash,
-                    )
-                )
+                findings.append(_artifact_finding(
+                    "ART-005", "critical", backup, "Artifact SHA-256 does not match the catalog.",
+                    artifact_path, artifact_file_hash,
+                    expected=backup.sha256, actual=artifact_file_hash))
         manifest_dir_raw = datasets[backup.dataset_id].artifact_manifest_path
         try:
             manifest_dir = resolve_under(root, manifest_dir_raw, field="artifact_manifest_path")
@@ -121,18 +103,12 @@ def assess_artifacts(
         manifest_hash = ""
         if not manifest_path.is_file():
             failure_rules.append("ART-001")
-            findings.append(
-                _artifact_finding(
-                    "ART-001",
-                    "high",
-                    backup,
-                    "Artifact manifest is missing.",
-                    manifest_rel,
-                    artifact_file_hash,
-                )
-            )
+            findings.append(_artifact_finding(
+                "ART-001", "high", backup, "Artifact manifest is missing.",
+                manifest_rel, artifact_file_hash))
         else:
             manifest_hash = sha256_file(manifest_path)
+            manifest_fingerprints[backup.backup_id] = manifest_hash
             files.append(
                 FileFingerprint(manifest_rel, manifest_hash, manifest_path.stat().st_size)
             )
@@ -140,19 +116,13 @@ def assess_artifacts(
                 raw = json.loads(manifest_path.read_text(encoding="utf-8"))
             except (OSError, UnicodeError, json.JSONDecodeError):
                 raw = None
-            manifest = _parse_manifest(raw, manifest_rel)
+            manifest = _parse_manifest(raw, manifest_rel, backup.dataset_id, backup.backup_id)
             if manifest is None:
                 failure_rules.append("ART-002")
-                findings.append(
-                    _artifact_finding(
-                        "ART-002",
-                        "high",
-                        backup,
-                        "Artifact manifest is malformed or lacks required fields.",
-                        manifest_rel,
-                        manifest_hash,
-                    )
-                )
+                findings.append(_artifact_finding(
+                    "ART-002", "high", backup,
+                    "Artifact manifest is malformed or lacks required fields.",
+                    manifest_rel, manifest_hash))
             else:
                 manifests[backup.backup_id] = manifest
                 disagreements = []
@@ -164,17 +134,15 @@ def assess_artifacts(
                     disagreements.append("schema_version")
                 if disagreements:
                     failure_rules.append("ART-006")
-                    findings.append(
-                        _artifact_finding(
-                            "ART-006",
-                            "high",
-                            backup,
-                            f"Manifest disagrees with catalog: {', '.join(disagreements)}.",
-                            manifest_rel,
-                            manifest_hash,
-                            fields=disagreements,
-                        )
-                    )
+                    findings.append(_artifact_finding(
+                        "ART-006", "high", backup,
+                        f"Manifest disagrees with catalog: {', '.join(disagreements)}.",
+                        manifest_rel, manifest_hash, fields=disagreements))
+                if manifest.transaction_summary_error:
+                    findings.append(_artifact_finding(
+                        "ART-007", "high", backup,
+                        f"Transaction summary is malformed: {manifest.transaction_summary_error}",
+                        manifest_rel, manifest_hash))
         checks.append(
             ArtifactCheck(
                 backup_id=backup.backup_id,
@@ -187,10 +155,13 @@ def assess_artifacts(
     return ArtifactAssessment(
         tuple(checks),
         manifests,
+        manifest_fingerprints,
         tuple(sorted(findings, key=Finding.sort_key)),
         tuple(sorted(files, key=lambda item: item.path)),
     )
-def _parse_manifest(raw: object, rel_path: str) -> ArtifactManifest | None:
+def _parse_manifest(
+    raw: object, rel_path: str, dataset_id: str, source_backup_id: str
+) -> ArtifactManifest | None:
     if not isinstance(raw, dict):
         return None
     required = {"backup_id", "row_count", "data_sha256", "schema_version"}
@@ -208,12 +179,17 @@ def _parse_manifest(raw: object, rel_path: str) -> ArtifactManifest | None:
         return None
     if not isinstance(schema_version, str) or not schema_version:
         return None
+    summary, summary_error = parse_transaction_summary(
+        raw.get("transaction_summary"), dataset_id, source_backup_id, rel_path
+    )
     return ArtifactManifest(
         backup_id=backup_id,
         row_count=row_count,
         data_sha256=digest.lower(),
         schema_version=schema_version,
         path=rel_path,
+        transaction_summary=summary,
+        transaction_summary_error=summary_error,
     )
 def assess_evidence(
     events: tuple[DrillEvent, ...],

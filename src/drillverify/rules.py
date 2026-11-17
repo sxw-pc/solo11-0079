@@ -46,6 +46,7 @@ RULE_TITLES = {
     "ART-004": "Artifact size differs from catalog",
     "ART-005": "Artifact SHA-256 differs from catalog",
     "ART-006": "Manifest disagrees with catalog",
+    "ART-007": "Transaction summary in manifest is malformed",
     "EVID-001": "Evidence file is missing",
     "EVID-002": "Evidence file is invalid",
     "EVID-004": "Required drill step is missing",
@@ -61,6 +62,14 @@ RULE_TITLES = {
     "OBJ-POINT-001": "Dataset has no restorable point",
     "OBJ-RPO-001": "Recovery point objective is breached",
     "OBJ-RTO-001": "Recovery time objective is breached",
+    "TXN-001": "Transaction cohort specification is invalid",
+    "TXN-002": "Cohort member is missing or not restorable",
+    "TXN-003": "Cohort member manifest fingerprint mismatch",
+    "TXN-004": "Cohort member transaction summary is unusable",
+    "TXN-005": "No legal transaction attribution exists",
+    "TXN-006": "Every legal attribution is unbalanced",
+    "TXN-007": "Attribution interpretations disagree about conservation",
+    "TXN-008": "Attribution search budget exhausted",
 }
 
 RULE_CATEGORIES = {
@@ -73,6 +82,7 @@ RULE_CATEGORIES = {
     "OBJ-POINT": "recoverability",
     "OBJ-RPO": "rpo_gap",
     "OBJ-RTO": "rto_gap",
+    "TXN": "transaction_consistency",
 }
 
 REMEDIATION = {
@@ -85,6 +95,7 @@ REMEDIATION = {
     "recoverability": "Create a complete full backup with a valid artifact before the next drill.",
     "rpo_gap": "Add restorable points or revise the backup cadence to meet the RPO.",
     "rto_gap": "Reduce restore duration or file a reviewed recovery-target change.",
+    "transaction_consistency": "Reconcile the cohort transaction summaries and rerun the offline proof.",
     "general": "Investigate the cited evidence and schedule a controlled re-drill.",
 }
 

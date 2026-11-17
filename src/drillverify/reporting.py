@@ -21,7 +21,7 @@ STATIC_DIR = PACKAGE_DIR / "static"
 def build_report(bundle: RunBundle) -> dict[str, Any]:
     """Assemble the complete, deterministic report document."""
     plan = bundle.plan
-    return {
+    report: dict[str, Any] = {
         "schema_version": REPORT_VERSION,
         "tool": {"name": "drillverify", "version": __version__},
         "run_id": bundle.run_id,
@@ -53,6 +53,9 @@ def build_report(bundle: RunBundle) -> dict[str, Any]:
             "actions": [item.to_dict() for item in bundle.actions],
         },
     }
+    if bundle.cohorts:
+        report["transaction_cohorts"] = [item.to_dict() for item in bundle.cohorts]
+    return report
 
 
 def _dump_json(path: Path, value: object) -> None:
@@ -92,6 +95,21 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {_cell(item['dataset_id'])} | {item['status']} | {item['point_count']} | "
             f"{item['rpo']['status']} | {item['rpo']['max_gap_minutes']} | {item['drill_count']} |"
         )
+    cohorts = report.get("transaction_cohorts")
+    if cohorts:
+        lines.extend(["", "## Transaction Cohort Consistency", "",
+                      "| Cohort | Purpose | Status | Cause | Min gap | Max gap | Publish gate |",
+                      "|---|---|---|---|---:|---:|---|"])
+        for item in cohorts:
+            proof = item.get("proof") or {}
+            lines.append(
+                f"| {_cell(item['cohort_id'])} | {item['purpose']} | {item['status']} | "
+                f"{item['cause'] or '—'} | {proof.get('min_gap')} | {proof.get('max_gap')} | {item['publish_gate']} |"
+            )
+        lines.extend(["",
+                      "Cohort verdicts are grounded only in the declared transaction summaries of the "
+                      "specified restorable points. They are independent of per-dataset RPO and drill "
+                      "RTO, and the report clock is never treated as transaction evidence."])
     lines.extend(["", "## Sample Findings", "", "| Severity | Rule | Object | Message |", "|---|---|---|---|"])
     for item in report["findings"][:40]:
         lines.append(

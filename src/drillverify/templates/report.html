@@ -49,6 +49,31 @@
     </table>
   </div>
 
+  {% if report.transaction_cohorts %}
+  <h2>Transaction cohort consistency</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Cohort</th><th>Purpose</th><th>Status</th><th>Cause</th><th class="numeric">Min gap</th><th class="numeric">Max gap</th><th>Publish gate</th></tr></thead>
+      <tbody>
+      {% for item in report.transaction_cohorts %}
+        <tr>
+          <td><code>{{ item.cohort_id }}</code></td>
+          <td>{{ item.purpose }}</td>
+          <td><span class="status status-{{ 'pass' if item.status == 'proven_consistent' else ('fail' if item.status == 'proven_conflict' else 'warn') }}">{{ item.status }}</span></td>
+          <td>{{ item.cause or '—' }}</td>
+          <td class="numeric">{{ item.proof.min_gap if item.proof else 'n/a' }}</td>
+          <td class="numeric">{{ item.proof.max_gap if item.proof else 'n/a' }}</td>
+          <td>{{ item.publish_gate }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="small muted">Cohort verdicts use only the declared transaction summaries of the
+    specified restorable points. They are independent of per-dataset RPO and drill RTO, and the
+    report clock is never treated as transaction evidence.</p>
+  </div>
+  {% endif %}
+
   <h2>Findings</h2>
   <div class="panel">
     <table>

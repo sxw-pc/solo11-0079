@@ -8,6 +8,8 @@ from typing import Any
 
 from .timeutil import format_utc
 
+TRANSACTION_ROLES = ("order", "event", "debit", "credit")
+
 
 @dataclass(frozen=True)
 class BackupRecord:
@@ -76,21 +78,56 @@ class DrillEvent:
 
 
 @dataclass(frozen=True)
+class TransactionContribution:
+    """One row of a manifest's optional synthetic transaction summary bundle."""
+
+    dataset_id: str
+    backup_id: str
+    part_id: str
+    tx_ref_masked: str
+    amount: int
+    role: str
+    source_fingerprint: str
+    manifest_path: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "dataset_id": self.dataset_id,
+            "backup_id": self.backup_id,
+            "part_id": self.part_id,
+            "tx_ref_masked": self.tx_ref_masked,
+            "amount": self.amount,
+            "role": self.role,
+            "source_fingerprint": self.source_fingerprint,
+            "manifest_path": self.manifest_path,
+        }
+
+
+@dataclass(frozen=True)
 class ArtifactManifest:
     backup_id: str
     row_count: int
     data_sha256: str
     schema_version: str
     path: str
+    transaction_summary: tuple[TransactionContribution, ...] | None = None
+    transaction_summary_error: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "backup_id": self.backup_id,
             "row_count": self.row_count,
             "data_sha256": self.data_sha256,
             "schema_version": self.schema_version,
             "path": self.path,
         }
+        if self.transaction_summary is not None:
+            payload["transaction_summary"] = [
+                item.to_dict() for item in self.transaction_summary
+            ]
+        if self.transaction_summary_error:
+            payload["transaction_summary_error"] = self.transaction_summary_error
+        return payload
 
 
 @dataclass(frozen=True)
